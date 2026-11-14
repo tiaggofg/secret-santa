@@ -150,11 +150,11 @@ T11 → T12 → T13 → T14 → T15 → T16 → T17
 
 **Done when**:
 
-- [ ] Participantes a `<= 50.0m` recebem o mesmo `householdClusterId`, aplicando fechamento transitivo (A-B <= 50m e B-C <= 50m → A, B, C no mesmo cluster)
-- [ ] Participantes com `coordinates == null` recebem `householdClusterId` individual exclusivo
-- [ ] Testes unitários (`HouseholdClusterServiceTest`) validam transitividade, múltiplas residências e participantes sem GPS
-- [ ] Gate check passes: `JAVA_HOME=/usr/lib/jvm/jdk-25.0.4.1+1 mvn -f backend/pom.xml test`
-- [ ] Test count: 24+ tests pass (no silent deletions)
+- [x] Participantes a `<= 50.0m` recebem o mesmo `householdClusterId`, aplicando fechamento transitivo (A-B <= 50m e B-C <= 50m → A, B, C no mesmo cluster)
+- [x] Participantes com `coordinates == null` recebem `householdClusterId` individual exclusivo
+- [x] Testes unitários (`HouseholdClusterServiceTest`) validam transitividade, múltiplas residências e participantes sem GPS
+- [x] Gate check passes: `JAVA_HOME=/usr/lib/jvm/jdk-25.0.4.1+1 mvn -f backend/pom.xml test`
+- [x] Test count: 24+ tests pass (no silent deletions)
 
 **Tests**: unit
 **Gate**: quick

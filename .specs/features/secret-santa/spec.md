@@ -158,7 +158,7 @@ Each requirement gets a unique ID for tracking across design, tasks, and validat
 | Requirement ID | Story | Phase | Status |
 | -------------- | ----- | ----- | ------ |
 | PART-01 | P1: Cadastro Básico de Usuário (`username` + `PIN`), Lista de Grupos Disponíveis e Inscrição via Home ou Link do WhatsApp | Execute | Implementing |
-| PART-02 | P1: Cadastro Básico de Usuário (`username` + `PIN`), Lista de Grupos Disponíveis e Inscrição via Home ou Link do WhatsApp | Tasks | In Tasks |
+| PART-02 | P1: Cadastro Básico de Usuário (`username` + `PIN`), Lista de Grupos Disponíveis e Inscrição via Home ou Link do WhatsApp | Execute | Implementing |
 | GRP-01 | P1: Criação, Administração e Geração de Link de Redefinição pelo Organizador | Execute | Implementing |
 | GRP-02 | P1: Criação, Administração e Geração de Link de Redefinição pelo Organizador | Execute | Implementing |
 | DRAW-01 | P1: Algoritmo de Sorteio com Desarranjo e Restrição Geográfica Haversine | Execute | Implementing |
