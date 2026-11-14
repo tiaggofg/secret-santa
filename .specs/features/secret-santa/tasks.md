@@ -400,12 +400,12 @@ T11 → T12 → T13 → T14 → T15 → T16 → T17
 
 **Done when**:
 
-- [ ] Modal exibe o nome sorteado em card Tailwind CSS de alto contraste e botão `"Fechar e passar o celular"`
-- [ ] Ao fechar o modal, destruir o componente ou disparar `visibilitychange` para `hidden`, o Signal é sobrescrito com `null` e o nome sorteado desaparece do DOM
-- [ ] `localStorage`, `sessionStorage` e `document.cookie` permanecem com zero bytes do resultado do sorteio ou do PIN
-- [ ] Testes unitários Vitest (`ephemeral-reveal-modal.component.spec.ts`) verificam limpeza no clique, `ngOnDestroy`, `visibilitychange` e ausência total em Web Storage
-- [ ] Gate check passes: `npm --prefix frontend run test`
-- [ ] Test count: 29+ frontend tests pass (no silent deletions)
+- [x] Modal exibe o nome sorteado em card Tailwind CSS de alto contraste e botão `"Fechar e passar o celular"`
+- [x] Ao fechar o modal, destruir o componente ou disparar `visibilitychange` para `hidden`, o Signal é sobrescrito com `null` e o nome sorteado desaparece do DOM
+- [x] `localStorage`, `sessionStorage` e `document.cookie` permanecem com zero bytes do resultado do sorteio ou do PIN
+- [x] Testes unitários Vitest (`ephemeral-reveal-modal.component.spec.ts`) verificam limpeza no clique, `ngOnDestroy`, `visibilitychange` e ausência total em Web Storage
+- [x] Gate check passes: `npm --prefix frontend run test`
+- [x] Test count: 29+ frontend tests pass (no silent deletions)
 
 **Tests**: unit
 **Gate**: quick
