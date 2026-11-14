@@ -356,12 +356,12 @@ T11 → T12 → T13 → T14 → T15 → T16 → T17
 
 **Done when**:
 
-- [ ] Usuário se cadastra ou faz login e visualiza imediatamente as seções `"Meus Grupos"` e `"Grupos Disponíveis"`
-- [ ] Clicar em `"Participar"` em um grupo disponível captura/reutiliza o GPS e inscreve o usuário no grupo
-- [ ] Clicar em `"Cadastrar outro familiar / Trocar de usuário neste aparelho"` limpa a sessão de usuário em memória preservando o GPS no `DeviceSessionGeoStore`
-- [ ] Testes unitários Vitest (`home-groups-page.component.spec.ts`) validam cadastro, login, listagem de grupos disponíveis, inscrição com 1 toque, criação de grupo e troca de usuário no aparelho
-- [ ] Gate check passes: `npm --prefix frontend run test`
-- [ ] Test count: 18+ frontend tests pass (no silent deletions)
+- [x] Usuário se cadastra ou faz login e visualiza imediatamente as seções `"Meus Grupos"` e `"Grupos Disponíveis"`
+- [x] Clicar em `"Participar"` em um grupo disponível captura/reutiliza o GPS e inscreve o usuário no grupo
+- [x] Clicar em `"Cadastrar outro familiar / Trocar de usuário neste aparelho"` limpa a sessão de usuário em memória preservando o GPS no `DeviceSessionGeoStore`
+- [x] Testes unitários Vitest (`home-groups-page.component.spec.ts`) validam cadastro, login, listagem de grupos disponíveis, inscrição com 1 toque, criação de grupo e troca de usuário no aparelho
+- [x] Gate check passes: `npm --prefix frontend run test`
+- [x] Test count: 18+ frontend tests pass (no silent deletions)
 
 **Tests**: unit
 **Gate**: quick
