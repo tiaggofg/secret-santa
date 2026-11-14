@@ -333,12 +333,12 @@ T11 → T12 → T13 → T14 → T15 → T16 → T17
 
 **Done when**:
 
-- [ ] Captura solicita GPS com timeout de 8 segundos e retorna coordenadas quando concedido, ou `latitude: null, longitude: null` em erro/negação/HTTP inseguro
-- [ ] `DeviceSessionGeoStore` mantém as coordenadas recém-capturadas na memória da tela mesmo quando `AuthSessionStore.switchFamilyUser()` é acionado para cadastrar outro familiar no mesmo aparelho
-- [ ] `ShareLinkService` invoca `navigator.share` quando disponível ou copia a URL via `navigator.clipboard.writeText` como fallback
-- [ ] Testes unitários Vitest (`browser-geolocation.service.spec.ts`) cobrem GPS concedido, negado, timeout de 8s, reuso entre familiares e compartilhamento `navigator.share`/clipboard
-- [ ] Gate check passes: `npm --prefix frontend run test`
-- [ ] Test count: 11+ frontend tests pass (no silent deletions)
+- [x] Captura solicita GPS com timeout de 8 segundos e retorna coordenadas quando concedido, ou `latitude: null, longitude: null` em erro/negação/HTTP inseguro
+- [x] `DeviceSessionGeoStore` mantém as coordenadas recém-capturadas na memória da tela mesmo quando `AuthSessionStore.switchFamilyUser()` é acionado para cadastrar outro familiar no mesmo aparelho
+- [x] `ShareLinkService` invoca `navigator.share` quando disponível ou copia a URL via `navigator.clipboard.writeText` como fallback
+- [x] Testes unitários Vitest (`browser-geolocation.service.spec.ts`) cobrem GPS concedido, negado, timeout de 8s, reuso entre familiares e compartilhamento `navigator.share`/clipboard
+- [x] Gate check passes: `npm --prefix frontend run test`
+- [x] Test count: 11+ frontend tests pass (no silent deletions)
 
 **Tests**: unit
 **Gate**: quick
