@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: secret-santa-backend
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/secret_santa}
+      auto-index-creation: true
+
+secretsanta:
+  security:
+    token-secret: ${SECRETSANTA_TOKEN_SECRET:default-dev-secret-key-with-at-least-32-bytes-length-2026}
+    token-ttl-hours: 72

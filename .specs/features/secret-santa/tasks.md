@@ -9,7 +9,7 @@ Implement these tasks with the `tlc-spec-driven` skill: **activate it by name an
 ---
 
 **Design**: `.specs/features/secret-santa/design.md`
-**Status**: Approved
+**Status**: In Progress
 **Approved**: 2026-11-13 - user: "Está aprovado"
 **Build**: `test ! -f backend/pom.xml || JAVA_HOME=/usr/lib/jvm/jdk-25.0.4.1+1 mvn -f backend/pom.xml test-compile; test ! -f frontend/package.json || npm --prefix frontend run build`
 **Run backend**: `JAVA_HOME=/usr/lib/jvm/jdk-25.0.4.1+1 mvn -f backend/pom.xml test`
@@ -84,10 +84,10 @@ T11 → T12 → T13 → T14 → T15 → T16 → T17
 
 **Done when**:
 
-- [ ] `backend/pom.xml`, `docker-compose.yml`, `SecretSantaApplication` e `MongoTestContainerConfig` criados e configurados
-- [ ] Teste de contexto e conectividade MongoDB (`BackendMongoSmokeTest`) executa e valida a subida do banco
-- [ ] Gate check passes: `JAVA_HOME=/usr/lib/jvm/jdk-25.0.4.1+1 mvn -f backend/pom.xml test`
-- [ ] Test count: 1+ tests pass (no silent deletions)
+- [x] `backend/pom.xml`, `docker-compose.yml`, `SecretSantaApplication` e `MongoTestContainerConfig` criados e configurados
+- [x] Teste de contexto e conectividade MongoDB (`BackendMongoSmokeTest`) executa e valida a subida do banco
+- [x] Gate check passes: `JAVA_HOME=/usr/lib/jvm/jdk-25.0.4.1+1 mvn -f backend/pom.xml test`
+- [x] Test count: 1+ tests pass (no silent deletions)
 
 **Tests**: integration
 **Gate**: full
@@ -577,7 +577,7 @@ Proof: run backend | GroupAdminAndAuthControllerIT
 The feature's live state, written as it happens - a compaction gives no warning.
 
 **Settled mid-build:** none
-**Dispatched:** none
+**Dispatched:** Batch 1 (Phase 1: T1-T6) at HEAD e767279
 **Walked:** pending execution
 
 ---
