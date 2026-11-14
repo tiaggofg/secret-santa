@@ -379,10 +379,10 @@ T11 → T12 → T13 → T14 → T15 → T16 → T17
 
 **Done when**:
 
-- [ ] Painel admin exibe inscritos com `@username`, permite compartilhar `/g/{slug}`, gerar/compartilhar link `/reset/{token}` para qualquer inscrito, remover participante enquanto `OPEN` e disparar o sorteio quando há `>= 3` inscritos
-- [ ] Testes unitários Vitest (`admin-dashboard-page.component.spec.ts`) validam compartilhamento, geração de link de reset, listagem sigilosa, exclusão e sorteio
-- [ ] Gate check passes: `npm --prefix frontend run test`
-- [ ] Test count: 24+ frontend tests pass (no silent deletions)
+- [x] Painel admin exibe inscritos com `@username`, permite compartilhar `/g/{slug}`, gerar/compartilhar link `/reset/{token}` para qualquer inscrito, remover participante enquanto `OPEN` e disparar o sorteio quando há `>= 3` inscritos
+- [x] Testes unitários Vitest (`admin-dashboard-page.component.spec.ts`) validam compartilhamento, geração de link de reset, listagem sigilosa, exclusão e sorteio
+- [x] Gate check passes: `npm --prefix frontend run test`
+- [x] Test count: 24+ frontend tests pass (no silent deletions)
 
 **Tests**: unit
 **Gate**: quick
