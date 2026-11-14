@@ -105,11 +105,11 @@ T11 → T12 → T13 → T14 → T15 → T16 → T17
 
 **Done when**:
 
-- [ ] `GeoCoordinates.distanceInMetersTo` calcula a distância Haversine com precisão e valida limites `[-90, 90]` e `[-180, 180]`
-- [ ] `ParticipantName` (2..60 chars), `Username` (`^[a-z0-9._-]{3,30}$` case-insensitive) e validação de PIN numérico de 4 a 6 dígitos (`^\d{4,6}$`) rejeitam entradas inválidas
-- [ ] Testes unitários (`ValueObjectsTest` e `CleanArchitectureTest`) cobrem limites válidos/inválidos, distâncias `< 50m`, `= 50m`, `> 50m` e pureza arquitetural do domínio
-- [ ] Gate check passes: `JAVA_HOME=/usr/lib/jvm/jdk-25.0.4.1+1 mvn -f backend/pom.xml test`
-- [ ] Test count: 9+ tests pass (no silent deletions)
+- [x] `GeoCoordinates.distanceInMetersTo` calcula a distância Haversine com precisão e valida limites `[-90, 90]` e `[-180, 180]`
+- [x] `ParticipantName` (2..60 chars), `Username` (`^[a-z0-9._-]{3,30}$` case-insensitive) e validação de PIN numérico de 4 a 6 dígitos (`^\d{4,6}$`) rejeitam entradas inválidas
+- [x] Testes unitários (`ValueObjectsTest` e `CleanArchitectureTest`) cobrem limites válidos/inválidos, distâncias `< 50m`, `= 50m`, `> 50m` e pureza arquitetural do domínio
+- [x] Gate check passes: `JAVA_HOME=/usr/lib/jvm/jdk-25.0.4.1+1 mvn -f backend/pom.xml test`
+- [x] Test count: 9+ tests pass (no silent deletions)
 
 **Tests**: unit
 **Gate**: quick
