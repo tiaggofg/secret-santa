@@ -310,12 +310,12 @@ T11 → T12 → T13 → T14 → T15 → T16 → T17
 
 **Done when**:
 
-- [ ] Projeto Angular 19+ com Tailwind CSS e Vitest compila sem erros (`npm --prefix frontend run build`) e roteamento principal está configurado
-- [ ] `AuthSessionStore` mantém o usuário e token em Signal de memória volátil e expõe `switchFamilyUser()` limpando a sessão atual
-- [ ] `SecretSantaApiService` encapsula todas as chamadas HTTP tipadas enviando `Authorization: Bearer <token>` quando autenticado
-- [ ] Testes unitários Vitest (`secret-santa-api.service.spec.ts`) validam chamadas, `AuthSessionStore` e headers
-- [ ] Gate check passes: `npm --prefix frontend run test`
-- [ ] Test count: 5+ frontend tests pass (no silent deletions)
+- [x] Projeto Angular 19+ com Tailwind CSS e Vitest compila sem erros (`npm --prefix frontend run build`) e roteamento principal está configurado
+- [x] `AuthSessionStore` mantém o usuário e token em Signal de memória volátil e expõe `switchFamilyUser()` limpando a sessão atual
+- [x] `SecretSantaApiService` encapsula todas as chamadas HTTP tipadas enviando `Authorization: Bearer <token>` quando autenticado
+- [x] Testes unitários Vitest (`secret-santa-api.service.spec.ts`) validam chamadas, `AuthSessionStore` e headers
+- [x] Gate check passes: `npm --prefix frontend run test`
+- [x] Test count: 5+ frontend tests pass (no silent deletions)
 
 **Tests**: unit
 **Gate**: quick
@@ -577,7 +577,7 @@ Proof: run backend | GroupAdminAndAuthControllerIT
 The feature's live state, written as it happens - a compaction gives no warning.
 
 **Settled mid-build:** none
-**Dispatched:** Batch 1 (Phase 1: T1-T6) at HEAD e767279 (returned at f9de550); Batch 2 (Phase 2: T7-T10) at HEAD f9de550
+**Dispatched:** Batch 1 (Phase 1: T1-T6) at HEAD e767279 (returned at f9de550); Batch 2 (Phase 2: T7-T10) at HEAD f9de550 (returned at 907ce58); Batch 3 (Phase 3: T11-T17) at HEAD 907ce58
 **Walked:** pending execution
 
 ---
