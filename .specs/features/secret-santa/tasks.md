@@ -263,11 +263,11 @@ T11 → T12 → T13 → T14 → T15 → T16 → T17
 
 **Done when**:
 
-- [ ] Cadastro, login e redefinição de PIN por token único respondem conforme os critérios de aceite
-- [ ] Endpoints administrativos validam o usuário organizador autenticado (HTTP 401 sem token, HTTP 403 se não for o `organizerUserId`) e nunca vazam `drawnParticipantId` ou `pinHash`
-- [ ] Testes de integração MockMvc (`GroupAdminAndAuthControllerIT`) cobrem todos os cenários de autenticação, administração, sorteio e reset de PIN
-- [ ] Gate check passes: `JAVA_HOME=/usr/lib/jvm/jdk-25.0.4.1+1 mvn -f backend/pom.xml test`
-- [ ] Test count: 63+ tests pass (no silent deletions)
+- [x] Cadastro, login e redefinição de PIN por token único respondem conforme os critérios de aceite
+- [x] Endpoints administrativos validam o usuário organizador autenticado (HTTP 401 sem token, HTTP 403 se não for o `organizerUserId`) e nunca vazam `drawnParticipantId` ou `pinHash`
+- [x] Testes de integração MockMvc (`GroupAdminAndAuthControllerIT`) cobrem todos os cenários de autenticação, administração, sorteio e reset de PIN
+- [x] Gate check passes: `JAVA_HOME=/usr/lib/jvm/jdk-25.0.4.1+1 mvn -f backend/pom.xml test`
+- [x] Test count: 63+ tests pass (no silent deletions)
 
 **Tests**: integration
 **Gate**: full
