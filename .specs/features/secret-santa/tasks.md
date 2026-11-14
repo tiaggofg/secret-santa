@@ -194,11 +194,11 @@ T11 → T12 → T13 → T14 → T15 → T16 → T17
 
 **Done when**:
 
-- [ ] Mapeamento bidirecional preserva todos os campos de `UserAccount` e `SecretSantaGroup` (documento único com `participants` embutidos)
-- [ ] Índices únicos em `username` e `publicSlug` e controle de concorrência otimista (`@Version`) funcionam e lançam `OptimisticLockingFailureException` em escritas conflitantes sobre a mesma versão
-- [ ] Testes de integração (`MongoPersistenceAdaptersIT`) verificam persistência de documentos, busca por `resetTokenHash`, listagem de grupos e lock otimista
-- [ ] Gate check passes: `JAVA_HOME=/usr/lib/jvm/jdk-25.0.4.1+1 mvn -f backend/pom.xml test`
-- [ ] Test count: 36+ tests pass (no silent deletions)
+- [x] Mapeamento bidirecional preserva todos os campos de `UserAccount` e `SecretSantaGroup` (documento único com `participants` embutidos)
+- [x] Índices únicos em `username` e `publicSlug` e controle de concorrência otimista (`@Version`) funcionam e lançam `OptimisticLockingFailureException` em escritas conflitantes sobre a mesma versão
+- [x] Testes de integração (`MongoPersistenceAdaptersIT`) verificam persistência de documentos, busca por `resetTokenHash`, listagem de grupos e lock otimista
+- [x] Gate check passes: `JAVA_HOME=/usr/lib/jvm/jdk-25.0.4.1+1 mvn -f backend/pom.xml test`
+- [x] Test count: 36+ tests pass (no silent deletions)
 
 **Tests**: integration
 **Gate**: full
