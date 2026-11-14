@@ -242,10 +242,10 @@ T11 → T12 → T13 → T14 → T15 → T16 → T17
 
 **Done when**:
 
-- [ ] Exceções de validação e token de reset inválido/expirado retornam HTTP 400, falha de autenticação retorna HTTP 401, acesso admin por não-organizador retorna HTTP 403, conflitos retornam HTTP 409 e sorteio com `< 3` participantes retorna HTTP 422
-- [ ] Testes unitários (`GlobalExceptionHandlerTest`) validam cada código HTTP e payload de erro
-- [ ] Gate check passes: `JAVA_HOME=/usr/lib/jvm/jdk-25.0.4.1+1 mvn -f backend/pom.xml test`
-- [ ] Test count: 52+ tests pass (no silent deletions)
+- [x] Exceções de validação e token de reset inválido/expirado retornam HTTP 400, falha de autenticação retorna HTTP 401, acesso admin por não-organizador retorna HTTP 403, conflitos retornam HTTP 409 e sorteio com `< 3` participantes retorna HTTP 422
+- [x] Testes unitários (`GlobalExceptionHandlerTest`) validam cada código HTTP e payload de erro
+- [x] Gate check passes: `JAVA_HOME=/usr/lib/jvm/jdk-25.0.4.1+1 mvn -f backend/pom.xml test`
+- [x] Test count: 52+ tests pass (no silent deletions)
 
 **Tests**: unit
 **Gate**: quick
