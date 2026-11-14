@@ -445,11 +445,11 @@ T11 → T12 → T13 → T14 → T15 → T16 → T17
 
 **Done when**:
 
-- [ ] Página valida novo PIN numérico de 4 a 6 dígitos (`inputmode="numeric"`) e submete `{ token, newPin }` para `POST /api/v1/auth/reset-pin`
-- [ ] Em caso de sucesso, exibe confirmação e botão para prosseguir; em caso de token inválido/expirado (HTTP 400), exibe mensagem orientando a solicitar novo link ao organizador
-- [ ] Testes unitários Vitest (`reset-pin-page.component.spec.ts`) cobrem redefinição com sucesso e tratamento de token expirado/inválido
-- [ ] Gate check passes: `npm --prefix frontend run test`
-- [ ] Test count: 39+ frontend tests pass (no silent deletions)
+- [x] Página valida novo PIN numérico de 4 a 6 dígitos (`inputmode="numeric"`) e submete `{ token, newPin }` para `POST /api/v1/auth/reset-pin`
+- [x] Em caso de sucesso, exibe confirmação e botão para prosseguir; em caso de token inválido/expirado (HTTP 400), exibe mensagem orientando a solicitar novo link ao organizador
+- [x] Testes unitários Vitest (`reset-pin-page.component.spec.ts`) cobrem redefinição com sucesso e tratamento de token expirado/inválido
+- [x] Gate check passes: `npm --prefix frontend run test`
+- [x] Test count: 39+ frontend tests pass (no silent deletions)
 
 **Tests**: unit
 **Gate**: build
