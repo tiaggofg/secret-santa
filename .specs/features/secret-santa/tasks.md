@@ -285,12 +285,12 @@ T11 → T12 → T13 → T14 → T15 → T16 → T17
 
 **Done when**:
 
-- [ ] `GET /api/v1/groups` retorna `myGroups` e `availableGroups` para o usuário autenticado
-- [ ] `POST /api/v1/groups/{slug}/participants` inscreve o usuário autenticado no grupo `OPEN` (HTTP 201) ou retorna HTTP 409 se já inscrito ou se o grupo já estiver `DRAWN`
-- [ ] `POST /api/v1/groups/{slug}/participants/reveal` valida `{ username, pin }` e retorna `drawnParticipantName` (HTTP 200), ou HTTP 401/409
-- [ ] Testes de integração MockMvc (`GroupPublicControllerIT`) validam listagem de grupos disponíveis, inscrição, bloqueios 409 e revelação por PIN
-- [ ] Gate check passes: `JAVA_HOME=/usr/lib/jvm/jdk-25.0.4.1+1 mvn -f backend/pom.xml test`
-- [ ] Test count: 72+ tests pass (no silent deletions)
+- [x] `GET /api/v1/groups` retorna `myGroups` e `availableGroups` para o usuário autenticado
+- [x] `POST /api/v1/groups/{slug}/participants` inscreve o usuário autenticado no grupo `OPEN` (HTTP 201) ou retorna HTTP 409 se já inscrito ou se o grupo já estiver `DRAWN`
+- [x] `POST /api/v1/groups/{slug}/participants/reveal` valida `{ username, pin }` e retorna `drawnParticipantName` (HTTP 200), ou HTTP 401/409
+- [x] Testes de integração MockMvc (`GroupPublicControllerIT`) validam listagem de grupos disponíveis, inscrição, bloqueios 409 e revelação por PIN
+- [x] Gate check passes: `JAVA_HOME=/usr/lib/jvm/jdk-25.0.4.1+1 mvn -f backend/pom.xml test`
+- [x] Test count: 72+ tests pass (no silent deletions)
 
 **Tests**: integration
 **Gate**: full
