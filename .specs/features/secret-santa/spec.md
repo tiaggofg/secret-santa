@@ -162,7 +162,7 @@ Each requirement gets a unique ID for tracking across design, tasks, and validat
 | GRP-01 | P1: Criação, Administração e Geração de Link de Redefinição pelo Organizador | Execute | Implementing |
 | GRP-02 | P1: Criação, Administração e Geração de Link de Redefinição pelo Organizador | Execute | Implementing |
 | DRAW-01 | P1: Algoritmo de Sorteio com Desarranjo e Restrição Geográfica Haversine | Execute | Implementing |
-| DRAW-02 | P1: Algoritmo de Sorteio com Desarranjo e Restrição Geográfica Haversine | Tasks | In Tasks |
+| DRAW-02 | P1: Algoritmo de Sorteio com Desarranjo e Restrição Geográfica Haversine | Execute | Implementing |
 | REV-01 | P1: Revelação Efêmera Autenticada por Username + PIN e Redefinição por Link — Fluxo "Passar o Celular" | Execute | Implementing |
 | SEC-01 | P1: Revelação Efêmera Autenticada por Username + PIN e Redefinição por Link — Fluxo "Passar o Celular" | Execute | Implementing |
 

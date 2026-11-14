@@ -7,6 +7,8 @@ import com.secretsanta.domain.exception.GroupNotDrawnYetException;
 import com.secretsanta.domain.exception.InsufficientParticipantsForDrawException;
 import com.secretsanta.domain.exception.ResourceNotFoundException;
 import com.secretsanta.domain.exception.UnauthorizedOrganizerAccessException;
+import com.secretsanta.domain.service.DerangementDrawService;
+import com.secretsanta.domain.service.HouseholdClusterService;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -150,6 +152,15 @@ public final class SecretSantaGroup {
         if (!removed) {
             throw new ResourceNotFoundException("Participant not found in group");
         }
+    }
+
+    public DrawResult executeDraw(
+            HouseholdClusterService clusterService,
+            DerangementDrawService drawService,
+            Instant now) {
+        Objects.requireNonNull(clusterService, "clusterService must not be null");
+        Objects.requireNonNull(drawService, "drawService must not be null");
+        return executeDraw(currentParticipants -> drawService.computeDraw(currentParticipants, clusterService), now);
     }
 
     public DrawResult executeDraw(Function<List<Participant>, DrawResult> drawStrategy, Instant now) {

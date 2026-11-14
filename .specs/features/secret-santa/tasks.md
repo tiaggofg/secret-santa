@@ -172,11 +172,11 @@ T11 → T12 → T13 → T14 → T15 → T16 → T17
 
 **Done when**:
 
-- [ ] Sorteio estrito gera 0 colisões de núcleo familiar em 100% das execuções quando `max_cluster <= floor(N / 2)`
-- [ ] Fallback resolve cenários onde `max_cluster > floor(N / 2)` (ex: 5 na mesma casa + 1 externo) sem auto-sorteio e marca `geographicRestrictionRelaxed = true`
-- [ ] Testes unitários (`DerangementDrawServiceTest`) validam ambos os modos, grupos sem GPS e propriedades de permutação bijetiva
-- [ ] Gate check passes: `JAVA_HOME=/usr/lib/jvm/jdk-25.0.4.1+1 mvn -f backend/pom.xml test`
-- [ ] Test count: 30+ tests pass (no silent deletions)
+- [x] Sorteio estrito gera 0 colisões de núcleo familiar em 100% das execuções quando `max_cluster <= floor(N / 2)`
+- [x] Fallback resolve cenários onde `max_cluster > floor(N / 2)` (ex: 5 na mesma casa + 1 externo) sem auto-sorteio e marca `geographicRestrictionRelaxed = true`
+- [x] Testes unitários (`DerangementDrawServiceTest`) validam ambos os modos, grupos sem GPS e propriedades de permutação bijetiva
+- [x] Gate check passes: `JAVA_HOME=/usr/lib/jvm/jdk-25.0.4.1+1 mvn -f backend/pom.xml test`
+- [x] Test count: 30+ tests pass (no silent deletions)
 
 **Tests**: unit
 **Gate**: quick
