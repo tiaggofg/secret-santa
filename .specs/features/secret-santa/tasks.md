@@ -218,13 +218,13 @@ T11 → T12 → T13 → T14 → T15 → T16 → T17
 
 **Done when**:
 
-- [ ] Cadastro/login retorna token de sessão stateless válido e `listGroupsForUser` separa corretamente `myGroups` e `availableGroups` (grupos `OPEN` nos quais o usuário ainda não está inscrito)
-- [ ] Apenas o `organizerUserId` consegue executar ações administrativas no grupo (lançando HTTP 403 caso outro usuário autenticado tente acessar)
-- [ ] Geração de token cria link único `/reset/{token}` e a redefinição atualiza o `pinHash` invalidando o token imediatamente
-- [ ] DTOs nunca contêm `drawnParticipantId`, `pinHash` ou `resetTokenHash`
-- [ ] Testes de integração (`SecretSantaApplicationServiceIT`) cobrem cadastro, login, descoberta de grupos, inscrição concorrente, sorteio, revelação por PIN, reset por token e sigilo
-- [ ] Gate check passes: `JAVA_HOME=/usr/lib/jvm/jdk-25.0.4.1+1 mvn -f backend/pom.xml test`
-- [ ] Test count: 45+ tests pass (no silent deletions)
+- [x] Cadastro/login retorna token de sessão stateless válido e `listGroupsForUser` separa corretamente `myGroups` e `availableGroups` (grupos `OPEN` nos quais o usuário ainda não está inscrito)
+- [x] Apenas o `organizerUserId` consegue executar ações administrativas no grupo (lançando HTTP 403 caso outro usuário autenticado tente acessar)
+- [x] Geração de token cria link único `/reset/{token}` e a redefinição atualiza o `pinHash` invalidando o token imediatamente
+- [x] DTOs nunca contêm `drawnParticipantId`, `pinHash` ou `resetTokenHash`
+- [x] Testes de integração (`SecretSantaApplicationServiceIT`) cobrem cadastro, login, descoberta de grupos, inscrição concorrente, sorteio, revelação por PIN, reset por token e sigilo
+- [x] Gate check passes: `JAVA_HOME=/usr/lib/jvm/jdk-25.0.4.1+1 mvn -f backend/pom.xml test`
+- [x] Test count: 45+ tests pass (no silent deletions)
 
 **Tests**: integration
 **Gate**: full
@@ -577,7 +577,7 @@ Proof: run backend | GroupAdminAndAuthControllerIT
 The feature's live state, written as it happens - a compaction gives no warning.
 
 **Settled mid-build:** none
-**Dispatched:** Batch 1 (Phase 1: T1-T6) at HEAD e767279
+**Dispatched:** Batch 1 (Phase 1: T1-T6) at HEAD e767279 (returned at f9de550); Batch 2 (Phase 2: T7-T10) at HEAD f9de550
 **Walked:** pending execution
 
 ---
