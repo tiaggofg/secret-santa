@@ -423,11 +423,11 @@ T11 → T12 → T13 → T14 → T15 → T16 → T17
 
 **Done when**:
 
-- [ ] Visitante não autenticado que abre `/g/{slug}` enquanto `OPEN` consegue se cadastrar/logar na própria tela e é inscrito automaticamente no grupo com captura/fallback de GPS
-- [ ] Quando `DRAWN`, permite revelar quem tirou informando `username` + `pin` (ou clicando no nome na lista para preencher `username` e digitando o `pin`), limpando o campo `pin` e abrindo o modal efêmero
-- [ ] Testes unitários Vitest (`public-group-page.component.spec.ts`) validam entrada direta via link do WhatsApp, inscrição com fallback de GPS, troca de usuário para dependente e revelação por PIN
-- [ ] Gate check passes: `npm --prefix frontend run test`
-- [ ] Test count: 35+ frontend tests pass (no silent deletions)
+- [x] Visitante não autenticado que abre `/g/{slug}` enquanto `OPEN` consegue se cadastrar/logar na própria tela e é inscrito automaticamente no grupo com captura/fallback de GPS
+- [x] Quando `DRAWN`, permite revelar quem tirou informando `username` + `pin` (ou clicando no nome na lista para preencher `username` e digitando o `pin`), limpando o campo `pin` e abrindo o modal efêmero
+- [x] Testes unitários Vitest (`public-group-page.component.spec.ts`) validam entrada direta via link do WhatsApp, inscrição com fallback de GPS, troca de usuário para dependente e revelação por PIN
+- [x] Gate check passes: `npm --prefix frontend run test`
+- [x] Test count: 35+ frontend tests pass (no silent deletions)
 
 **Tests**: unit
 **Gate**: quick
