@@ -160,11 +160,11 @@ Each requirement gets a unique ID for tracking across design, tasks, and validat
 | PART-01 | P1: Cadastro Básico de Usuário (`username` + `PIN`), Lista de Grupos Disponíveis e Inscrição via Home ou Link do WhatsApp | Execute | Implementing |
 | PART-02 | P1: Cadastro Básico de Usuário (`username` + `PIN`), Lista de Grupos Disponíveis e Inscrição via Home ou Link do WhatsApp | Tasks | In Tasks |
 | GRP-01 | P1: Criação, Administração e Geração de Link de Redefinição pelo Organizador | Execute | Implementing |
-| GRP-02 | P1: Criação, Administração e Geração de Link de Redefinição pelo Organizador | Tasks | In Tasks |
+| GRP-02 | P1: Criação, Administração e Geração de Link de Redefinição pelo Organizador | Execute | Implementing |
 | DRAW-01 | P1: Algoritmo de Sorteio com Desarranjo e Restrição Geográfica Haversine | Execute | Implementing |
 | DRAW-02 | P1: Algoritmo de Sorteio com Desarranjo e Restrição Geográfica Haversine | Tasks | In Tasks |
 | REV-01 | P1: Revelação Efêmera Autenticada por Username + PIN e Redefinição por Link — Fluxo "Passar o Celular" | Execute | Implementing |
-| SEC-01 | P1: Revelação Efêmera Autenticada por Username + PIN e Redefinição por Link — Fluxo "Passar o Celular" | Tasks | In Tasks |
+| SEC-01 | P1: Revelação Efêmera Autenticada por Username + PIN e Redefinição por Link — Fluxo "Passar o Celular" | Execute | Implementing |
 
 **ID format:** `[CATEGORY]-[NUMBER]`
 

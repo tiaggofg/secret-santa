@@ -84,6 +84,9 @@ public class MongoTestContainerConfig
 
     private static boolean isDockerAvailable() {
         try {
+            if (!new java.io.File("/var/run/docker.sock").canWrite()) {
+                return false;
+            }
             return DockerClientFactory.instance().isDockerAvailable();
         } catch (Throwable ex) {
             return false;

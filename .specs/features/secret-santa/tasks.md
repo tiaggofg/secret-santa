@@ -127,12 +127,12 @@ T11 → T12 → T13 → T14 → T15 → T16 → T17
 
 **Done when**:
 
-- [ ] `UserAccount` gerencia emissão, validação de expiração e invalidação imediata do `PasswordResetTokenHash` no primeiro uso
-- [ ] `SecretSantaGroup` protege invariantes de estado (`OPEN` vs `DRAWN`), `organizerUserId`, mínimo de 3 participantes e unicidade de usuário no grupo
-- [ ] `Participant` e `UserAccount` não vazam `drawnParticipantId`, `pinHash` ou `resetTokenHash` em `toString()`
-- [ ] Testes unitários (`SecretSantaGroupTest` e `UserAccountTest`) cobrem todos os fluxos e invariantes de ambos os Aggregates
-- [ ] Gate check passes: `JAVA_HOME=/usr/lib/jvm/jdk-25.0.4.1+1 mvn -f backend/pom.xml test`
-- [ ] Test count: 19+ tests pass (no silent deletions)
+- [x] `UserAccount` gerencia emissão, validação de expiração e invalidação imediata do `PasswordResetTokenHash` no primeiro uso
+- [x] `SecretSantaGroup` protege invariantes de estado (`OPEN` vs `DRAWN`), `organizerUserId`, mínimo de 3 participantes e unicidade de usuário no grupo
+- [x] `Participant` e `UserAccount` não vazam `drawnParticipantId`, `pinHash` ou `resetTokenHash` em `toString()`
+- [x] Testes unitários (`SecretSantaGroupTest` e `UserAccountTest`) cobrem todos os fluxos e invariantes de ambos os Aggregates
+- [x] Gate check passes: `JAVA_HOME=/usr/lib/jvm/jdk-25.0.4.1+1 mvn -f backend/pom.xml test`
+- [x] Test count: 19+ tests pass (no silent deletions)
 
 **Tests**: unit
 **Gate**: quick
