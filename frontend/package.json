@@ -5,7 +5,7 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
-    "build": "CI=true HOME=/tmp ng build",
+    "build": "node scripts/set-env.mjs && CI=true HOME=/tmp ng build",
     "test": "vitest run --reporter=verbose"
   },
   "dependencies": {

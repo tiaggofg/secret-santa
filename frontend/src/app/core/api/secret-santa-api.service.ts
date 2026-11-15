@@ -1,6 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
 import { AuthSessionStore } from '../auth/auth-session.store';
 import {
   AdminGroupView,
@@ -26,7 +27,7 @@ import {
 export class SecretSantaApiService {
   private readonly http = inject(HttpClient);
   private readonly authStore = inject(AuthSessionStore);
-  private readonly baseUrl = '/api/v1';
+  private readonly baseUrl = `${environment.apiUrl}/api/v1`;
 
   register(request: RegisterUserRequest): Observable<AuthSessionView> {
     return this.http.post<AuthSessionView>(`${this.baseUrl}/auth/register`, request);
