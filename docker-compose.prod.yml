@@ -1,0 +1,14 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: secret-santa-backend
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    environment:
+      MONGODB_URI: ${MONGODB_URI:?Defina MONGODB_URI com a string de conexão do MongoDB}
+      SECRETSANTA_TOKEN_SECRET: ${SECRETSANTA_TOKEN_SECRET:?Defina SECRETSANTA_TOKEN_SECRET com pelo menos 32 caracteres}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
