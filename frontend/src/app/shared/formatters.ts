@@ -44,3 +44,17 @@ export function getAvatarTone(name: string): string {
   }
   return AVATAR_TONES[hash % AVATAR_TONES.length];
 }
+
+/**
+ * Generates a normalized username suggestion from a display name.
+ */
+export function suggestUsername(rawName: string): string {
+  return rawName
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '.')
+    .replace(/^\.+|\.+$/g, '')
+    .slice(0, 30);
+}

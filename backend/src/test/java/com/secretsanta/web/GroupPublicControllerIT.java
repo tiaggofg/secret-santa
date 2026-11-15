@@ -9,6 +9,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.secretsanta.application.SecretSantaApplicationService;
 import com.secretsanta.config.MongoTestContainerConfig;
+import com.secretsanta.domain.model.Username;
+import com.secretsanta.domain.port.UserAccountRepository;
 import com.secretsanta.infrastructure.persistence.SecretSantaGroupDocument;
 import com.secretsanta.infrastructure.persistence.SecretSantaIndexesChangeUnit;
 import com.secretsanta.infrastructure.persistence.UserAccountDocument;
@@ -41,6 +43,9 @@ class GroupPublicControllerIT {
     private SecretSantaApplicationService applicationService;
 
     @Autowired
+    private UserAccountRepository userAccountRepository;
+
+    @Autowired
     private MongoTemplate mongoTemplate;
 
     @Autowired
@@ -54,60 +59,96 @@ class GroupPublicControllerIT {
     }
 
     @Test
-    void shouldListMyGroupsAndAvailableOpenGroupsForAuthenticatedUser_C6() throws Exception {
+    void shouldListOnlyMyGroupsForAuthenticatedUser() throws Exception {
         var userA = applicationService.registerUser("User A", "user.a", "1234");
         var userB = applicationService.registerUser("User B", "user.b", "1234");
 
-        var myGroup = applicationService.createGroup(userA.userId(), "Grupo do User A");
-        applicationService.registerParticipant(myGroup.slug(), userA.userId(), -23.42, -51.93);
+        var myGroup = applicationService.createGroup(userA.userId(), "Grupo do User A", "1234");
+        applicationService.registerParticipant(myGroup.id(), userA.userId(), null, -23.42, -51.93);
 
-        var openAvailableGroup = applicationService.createGroup(userB.userId(), "Grupo Aberto da Família");
+        applicationService.createGroup(userB.userId(), "Grupo Privado B", "5678");
 
         mockMvc.perform(get("/api/v1/groups")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + userA.token()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.myGroups.length()").value(1))
-                .andExpect(jsonPath("$.myGroups[0].slug").value(myGroup.slug()))
+                .andExpect(jsonPath("$.myGroups[0].id").value(myGroup.id().toString()))
+                .andExpect(jsonPath("$.myGroups[0].sharePath").value("/g/" + myGroup.id()))
                 .andExpect(jsonPath("$.myGroups[0].organizer").value(true))
                 .andExpect(jsonPath("$.myGroups[0].joined").value(true))
-                .andExpect(jsonPath("$.availableGroups.length()").value(1))
-                .andExpect(jsonPath("$.availableGroups[0].slug").value(openAvailableGroup.slug()))
-                .andExpect(jsonPath("$.availableGroups[0].status").value("OPEN"));
+                .andExpect(jsonPath("$.availableGroups").doesNotExist());
     }
 
     @Test
-    void shouldGetPublicGroupDetailsBySlugAndOmitSensitiveFields() throws Exception {
+    void shouldHideParticipantsForNonMembersAndExposeForMembersAndReturn404ForInvalidUuid() throws Exception {
         var org = applicationService.registerUser("Org", "org.pub", "1234");
         var member = applicationService.registerUser("Membro", "membro.pub", "2222");
+        var outsider = applicationService.registerUser("Visitante", "outsider.pub", "3333");
 
-        var group = applicationService.createGroup(org.userId(), "Natal Público");
-        applicationService.registerParticipant(group.slug(), member.userId(), -23.42, -51.93);
+        var group = applicationService.createGroup(org.userId(), "Natal Privado", "4321");
+        applicationService.registerParticipant(group.id(), member.userId(), "4321", -23.42, -51.93);
 
-        MvcResult res = mockMvc.perform(get("/api/v1/groups/{slug}", group.slug())
+        // Anonymous visitor -> participantsVisible: false, participants: []
+        mockMvc.perform(get("/api/v1/groups/{groupId}", group.id()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(group.id().toString()))
+                .andExpect(jsonPath("$.eventName").value("Natal Privado"))
+                .andExpect(jsonPath("$.participantCount").value(1))
+                .andExpect(jsonPath("$.participantsVisible").value(false))
+                .andExpect(jsonPath("$.participants.length()").value(0));
+
+        // Authenticated non-member -> participantsVisible: false
+        mockMvc.perform(get("/api/v1/groups/{groupId}", group.id())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + outsider.token()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.participantsVisible").value(false))
+                .andExpect(jsonPath("$.participants.length()").value(0));
+
+        // Member -> participantsVisible: true with full participants list
+        MvcResult res = mockMvc.perform(get("/api/v1/groups/{groupId}", group.id())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + member.token()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.slug").value(group.slug()))
-                .andExpect(jsonPath("$.eventName").value("Natal Público"))
+                .andExpect(jsonPath("$.id").value(group.id().toString()))
+                .andExpect(jsonPath("$.eventName").value("Natal Privado"))
                 .andExpect(jsonPath("$.joined").value(true))
                 .andExpect(jsonPath("$.organizer").value(false))
+                .andExpect(jsonPath("$.participantsVisible").value(true))
+                .andExpect(jsonPath("$.participantCount").value(1))
                 .andExpect(jsonPath("$.participants.length()").value(1))
                 .andExpect(jsonPath("$.participants[0].username").value("membro.pub"))
                 .andReturn();
 
         assertThat(res.getResponse().getContentAsString())
-                .doesNotContain("drawnParticipantId", "pinHash", "resetTokenHash");
+                .doesNotContain("drawnParticipantId", "pinHash", "groupPinHash", "resetTokenHash");
+
+        // Invalid UUID -> 404
+        mockMvc.perform(get("/api/v1/groups/{groupId}", "not-a-uuid"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void shouldJoinOpenGroupWithValidGeolocationAndReturn201_C8() throws Exception {
+    void shouldJoinOpenGroupWithValidGroupPinAndRejectInvalidGroupPinWith403() throws Exception {
         var org = applicationService.registerUser("Org", "org.join", "1234");
         var participant = applicationService.registerUser("Pedro", "pedro.silva", "4567");
-        var group = applicationService.createGroup(org.userId(), "Natal GPS");
+        var group = applicationService.createGroup(org.userId(), "Natal GPS", "7890");
 
-        mockMvc.perform(post("/api/v1/groups/{slug}/participants", group.slug())
+        // Wrong group PIN -> 403 INVALID_GROUP_PIN
+        mockMvc.perform(post("/api/v1/groups/{groupId}/participants", group.id())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + participant.token())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
+                                "groupPin", "0000",
+                                "latitude", -23.420999,
+                                "longitude", -51.933056))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_GROUP_PIN"));
+
+        // Correct group PIN -> 201 Created
+        mockMvc.perform(post("/api/v1/groups/{groupId}/participants", group.id())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + participant.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "groupPin", "7890",
                                 "latitude", -23.420999,
                                 "longitude", -51.933056))))
                 .andExpect(status().isCreated())
@@ -116,19 +157,28 @@ class GroupPublicControllerIT {
                 .andExpect(jsonPath("$.username").value("pedro.silva"))
                 .andExpect(jsonPath("$.hasGeoLocation").value(true))
                 .andExpect(jsonPath("$.revealStatus").value("WAITING_DRAW"));
+
+        // Organizer joins own group without groupPin -> 201 Created
+        mockMvc.perform(post("/api/v1/groups/{groupId}/participants", group.id())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + org.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.userId").value(org.userId().toString()));
     }
 
     @Test
     void shouldJoinOpenGroupWithNullGeolocationFallbackAndReturn201() throws Exception {
         var org = applicationService.registerUser("Org", "org.nogps", "1234");
         var participant = applicationService.registerUser("Julia", "julia.silva", "4567");
-        var group = applicationService.createGroup(org.userId(), "Natal Sem GPS");
+        var group = applicationService.createGroup(org.userId(), "Natal Sem GPS", "1234");
 
         Map<String, Object> body = new HashMap<>();
+        body.put("groupPin", "1234");
         body.put("latitude", null);
         body.put("longitude", null);
 
-        mockMvc.perform(post("/api/v1/groups/{slug}/participants", group.slug())
+        mockMvc.perform(post("/api/v1/groups/{groupId}/participants", group.id())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + participant.token())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(body)))
@@ -138,16 +188,31 @@ class GroupPublicControllerIT {
     }
 
     @Test
-    void shouldSupportDirectUnauthenticatedVisitorRegistrationAndJoinViaWhatsAppLink() throws Exception {
+    void shouldSupportDirectUnauthenticatedVisitorRegistrationAndAvoidOrphanOnWrongGroupPin() throws Exception {
         var org = applicationService.registerUser("Org", "org.whats", "1234");
-        var group = applicationService.createGroup(org.userId(), "Natal Link Direto");
+        var group = applicationService.createGroup(org.userId(), "Natal Link Direto", "9876");
 
-        mockMvc.perform(post("/api/v1/groups/{slug}/participants", group.slug())
+        // Wrong groupPin -> 403 and no orphan user created
+        mockMvc.perform(post("/api/v1/groups/{groupId}/participants", group.id())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Orphan User",
+                                "username", "orphan.it",
+                                "pin", "1945",
+                                "groupPin", "0000"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_GROUP_PIN"));
+
+        assertThat(userAccountRepository.findByUsername(new Username("orphan.it"))).isEmpty();
+
+        // Valid groupPin -> 201
+        mockMvc.perform(post("/api/v1/groups/{groupId}/participants", group.id())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "name", "Vovó Helena",
                                 "username", "vovo.helena",
                                 "pin", "1945",
+                                "groupPin", "9876",
                                 "latitude", -23.42,
                                 "longitude", -51.93))))
                 .andExpect(status().isCreated())
@@ -164,26 +229,26 @@ class GroupPublicControllerIT {
         var u3 = applicationService.registerUser("U3", "u3.dup", "1234");
         var u4 = applicationService.registerUser("U4", "u4.dup", "1234");
 
-        var group = applicationService.createGroup(u1.userId(), "Natal Conflito");
-        applicationService.registerParticipant(group.slug(), u1.userId(), null, null);
-        applicationService.registerParticipant(group.slug(), u2.userId(), null, null);
-        applicationService.registerParticipant(group.slug(), u3.userId(), null, null);
+        var group = applicationService.createGroup(u1.userId(), "Natal Conflito", "1234");
+        applicationService.registerParticipant(group.id(), u1.userId(), null, null, null);
+        applicationService.registerParticipant(group.id(), u2.userId(), "1234", null, null);
+        applicationService.registerParticipant(group.id(), u3.userId(), "1234", null, null);
 
         // User already enrolled in the group -> 409 Conflict
-        mockMvc.perform(post("/api/v1/groups/{slug}/participants", group.slug())
+        mockMvc.perform(post("/api/v1/groups/{groupId}/participants", group.id())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + u1.token())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isConflict());
 
         // Draw the group
-        applicationService.executeDraw(group.slug(), u1.userId());
+        applicationService.executeDraw(group.id(), u1.userId());
 
         // New user attempting to join after draw -> 409 Conflict
-        mockMvc.perform(post("/api/v1/groups/{slug}/participants", group.slug())
+        mockMvc.perform(post("/api/v1/groups/{groupId}/participants", group.id())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + u4.token())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
+                        .content(objectMapper.writeValueAsString(Map.of("groupPin", "1234"))))
                 .andExpect(status().isConflict());
     }
 
@@ -193,13 +258,13 @@ class GroupPublicControllerIT {
         var u2 = applicationService.registerUser("Mariana", "mariana", "2222");
         var u3 = applicationService.registerUser("Rafael", "rafael", "3333");
 
-        var group = applicationService.createGroup(u1.userId(), "Natal Revelar");
-        applicationService.registerParticipant(group.slug(), u1.userId(), -23.42, -51.93);
-        applicationService.registerParticipant(group.slug(), u2.userId(), -23.45, -51.95);
-        applicationService.registerParticipant(group.slug(), u3.userId(), -23.48, -51.98);
-        applicationService.executeDraw(group.slug(), u1.userId());
+        var group = applicationService.createGroup(u1.userId(), "Natal Revelar", "1234");
+        applicationService.registerParticipant(group.id(), u1.userId(), null, -23.42, -51.93);
+        applicationService.registerParticipant(group.id(), u2.userId(), "1234", -23.45, -51.95);
+        applicationService.registerParticipant(group.id(), u3.userId(), "1234", -23.48, -51.98);
+        applicationService.executeDraw(group.id(), u1.userId());
 
-        MvcResult res = mockMvc.perform(post("/api/v1/groups/{slug}/participants/reveal", group.slug())
+        MvcResult res = mockMvc.perform(post("/api/v1/groups/{groupId}/participants/reveal", group.id())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "username", "lucas",
@@ -223,14 +288,14 @@ class GroupPublicControllerIT {
         var u3 = applicationService.registerUser("Rafael", "rafael.c31", "3333");
         applicationService.registerUser("Forasteiro", "forasteiro.c31", "4444");
 
-        var group = applicationService.createGroup(u1.userId(), "Natal C31");
-        applicationService.registerParticipant(group.slug(), u1.userId(), null, null);
-        applicationService.registerParticipant(group.slug(), u2.userId(), null, null);
-        applicationService.registerParticipant(group.slug(), u3.userId(), null, null);
-        applicationService.executeDraw(group.slug(), u1.userId());
+        var group = applicationService.createGroup(u1.userId(), "Natal C31", "1234");
+        applicationService.registerParticipant(group.id(), u1.userId(), null, null, null);
+        applicationService.registerParticipant(group.id(), u2.userId(), "1234", null, null);
+        applicationService.registerParticipant(group.id(), u3.userId(), "1234", null, null);
+        applicationService.executeDraw(group.id(), u1.userId());
 
         // Incorrect PIN -> 401
-        mockMvc.perform(post("/api/v1/groups/{slug}/participants/reveal", group.slug())
+        mockMvc.perform(post("/api/v1/groups/{groupId}/participants/reveal", group.id())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "username", "lucas.c31",
@@ -238,7 +303,7 @@ class GroupPublicControllerIT {
                 .andExpect(status().isUnauthorized());
 
         // Username not enrolled in group -> 401
-        mockMvc.perform(post("/api/v1/groups/{slug}/participants/reveal", group.slug())
+        mockMvc.perform(post("/api/v1/groups/{groupId}/participants/reveal", group.id())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "username", "forasteiro.c31",
@@ -249,10 +314,10 @@ class GroupPublicControllerIT {
     @Test
     void shouldRejectRevealWhenGroupIsStillOpenWith409_C32() throws Exception {
         var u1 = applicationService.registerUser("Lucas", "lucas.c32", "1111");
-        var group = applicationService.createGroup(u1.userId(), "Natal Aberto C32");
-        applicationService.registerParticipant(group.slug(), u1.userId(), null, null);
+        var group = applicationService.createGroup(u1.userId(), "Natal Aberto C32", "1234");
+        applicationService.registerParticipant(group.id(), u1.userId(), null, null, null);
 
-        mockMvc.perform(post("/api/v1/groups/{slug}/participants/reveal", group.slug())
+        mockMvc.perform(post("/api/v1/groups/{groupId}/participants/reveal", group.id())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "username", "lucas.c32",

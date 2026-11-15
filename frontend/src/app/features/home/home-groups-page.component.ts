@@ -1,7 +1,6 @@
 import { Component, effect, inject, OnInit, signal } from '@angular/core';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { HttpErrorResponse } from '@angular/common/http';
 import { SecretSantaApiService } from '../../core/api/secret-santa-api.service';
 import { GroupSummaryView } from '../../core/api/secret-santa-api.models';
 import { AuthSessionStore } from '../../core/auth/auth-session.store';
@@ -25,57 +24,12 @@ import { formatParticipantCount, getAvatarTone, getInitials } from '../../shared
             Amigo Secreto
           </h1>
           <p class="text-sm text-emerald-100/95 leading-relaxed">
-            Organize o sorteio pelo WhatsApp em segundos, com proteção automática para não tirar quem mora na mesma casa.
+            Entre para criar seu Amigo Secreto ou participar dos sorteios com a família e amigos!
           </p>
-          <div class="flex flex-wrap gap-2 pt-1">
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 border border-white/20 text-xs font-semibold text-white">
-              <app-festive-icon name="check" svgClass="w-3.5 h-3.5 text-amber-300" />
-              Sem e-mail
-            </span>
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 border border-white/20 text-xs font-semibold text-white">
-              <app-festive-icon name="key" svgClass="w-3.5 h-3.5 text-amber-300" />
-              PIN de 4-6 dígitos
-            </span>
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 border border-white/20 text-xs font-semibold text-white">
-              <app-festive-icon name="gps" svgClass="w-3.5 h-3.5 text-amber-300" />
-              Evita mesma casa
-            </span>
-          </div>
         </section>
 
-        <!-- Auth Card -->
+        <!-- Direct Login Card -->
         <section class="bg-festive-card border border-festive-border rounded-3xl p-5 shadow-sm space-y-4">
-          <div class="grid grid-cols-2 gap-2 bg-festive-cream border border-festive-border p-1.5 rounded-2xl" role="tablist">
-            <button
-              type="button"
-              role="tab"
-              [attr.aria-selected]="authMode() === 'register'"
-              data-testid="tab-register"
-              (click)="setAuthMode('register')"
-              [class]="
-                authMode() === 'register'
-                  ? 'min-h-12 rounded-xl bg-white text-pine-900 font-bold shadow-sm text-sm border border-festive-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500'
-                  : 'min-h-12 rounded-xl text-ink-600 font-semibold text-sm hover:text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500'
-              "
-            >
-              Criar Cadastro
-            </button>
-            <button
-              type="button"
-              role="tab"
-              [attr.aria-selected]="authMode() === 'login'"
-              data-testid="tab-login"
-              (click)="setAuthMode('login')"
-              [class]="
-                authMode() === 'login'
-                  ? 'min-h-12 rounded-xl bg-white text-pine-900 font-bold shadow-sm text-sm border border-festive-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500'
-                  : 'min-h-12 rounded-xl text-ink-600 font-semibold text-sm hover:text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500'
-              "
-            >
-              Já tenho conta
-            </button>
-          </div>
-
           @if (errorMessage()) {
             <div
               role="alert"
@@ -86,169 +40,75 @@ import { formatParticipantCount, getAvatarTone, getInitials } from '../../shared
             </div>
           }
 
-          @if (authMode() === 'register') {
-            <form
-              [formGroup]="registerForm"
-              (ngSubmit)="submitRegister()"
-              data-testid="register-form"
-              class="space-y-4"
+          <form
+            [formGroup]="loginForm"
+            (ngSubmit)="submitLogin()"
+            data-testid="login-form"
+            class="space-y-4"
+          >
+            <div>
+              <label for="login-username" class="block text-sm font-semibold text-ink-900 mb-1.5">
+                Seu nome de usuário
+              </label>
+              <input
+                id="login-username"
+                type="text"
+                formControlName="username"
+                placeholder="Ex: maria.silva"
+                autocapitalize="none"
+                class="w-full min-h-12 rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-base lowercase text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label for="login-pin" class="block text-sm font-semibold text-ink-900 mb-1.5">
+                Seu PIN (4 a 6 dígitos)
+              </label>
+              <div class="relative flex items-center">
+                <input
+                  id="login-pin"
+                  [type]="showLoginPin() ? 'text' : 'password'"
+                  inputmode="numeric"
+                  maxlength="6"
+                  formControlName="pin"
+                  placeholder="••••"
+                  class="w-full min-h-12 rounded-xl border border-stone-300 bg-white pl-3.5 pr-12 py-2.5 text-lg tracking-widest tabular-nums text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  (click)="showLoginPin.set(!showLoginPin())"
+                  aria-label="Mostrar ou ocultar PIN"
+                  class="absolute right-1 min-w-11 min-h-11 rounded-lg flex items-center justify-center text-ink-600 hover:text-pine-900 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                >
+                  <app-festive-icon [name]="showLoginPin() ? 'eye-off' : 'eye'" svgClass="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              data-testid="login-submit"
+              [disabled]="isSubmitting()"
+              class="w-full min-h-12 rounded-xl bg-pine-800 hover:bg-pine-900 disabled:opacity-60 text-white font-bold text-base shadow-sm transition flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
             >
-              <div>
-                <label for="reg-name" class="block text-sm font-semibold text-ink-900 mb-1.5">
-                  Seu Nome
-                </label>
-                <input
-                  id="reg-name"
-                  type="text"
-                  formControlName="name"
-                  (input)="onNameInput()"
-                  placeholder="Ex: Maria Silva"
-                  class="w-full min-h-12 rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-base text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
-                />
-                @if (
-                  (registerForm.controls.name.touched || registerForm.controls.name.dirty) &&
-                  registerForm.controls.name.invalid
-                ) {
-                  <p class="text-xs text-cranberry-700 font-medium mt-1">
-                    Informe seu nome completo ou apelido (2 a 60 caracteres).
-                  </p>
-                }
-              </div>
+              @if (isSubmitting()) {
+                <app-festive-icon name="spinner" svgClass="w-5 h-5" />
+                <span>Entrando...</span>
+              } @else {
+                <span>Entrar</span>
+              }
+            </button>
+          </form>
 
-              <div>
-                <label for="reg-username" class="block text-sm font-semibold text-ink-900 mb-1.5">
-                  Nome de Usuário (username)
-                </label>
-                <input
-                  id="reg-username"
-                  type="text"
-                  formControlName="username"
-                  (input)="onUsernameManualEdit()"
-                  placeholder="Ex: maria.silva"
-                  autocapitalize="none"
-                  class="w-full min-h-12 rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-base lowercase text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
-                />
-                <p class="text-xs text-ink-600 mt-1">
-                  3 a 30 caracteres (letras minúsculas, números, ponto, hífen ou underline).
-                </p>
-                @if (
-                  (registerForm.controls.username.touched || registerForm.controls.username.dirty) &&
-                  registerForm.controls.username.invalid
-                ) {
-                  <p class="text-xs text-cranberry-700 font-medium mt-1">
-                    Use apenas letras minúsculas, números, ponto, hífen ou underline (3 a 30 caracteres).
-                  </p>
-                }
-              </div>
-
-              <div>
-                <label for="reg-pin" class="block text-sm font-semibold text-ink-900 mb-1.5">
-                  PIN Numérico (4 a 6 dígitos)
-                </label>
-                <div class="relative flex items-center">
-                  <input
-                    id="reg-pin"
-                    [type]="showRegPin() ? 'text' : 'password'"
-                    inputmode="numeric"
-                    maxlength="6"
-                    formControlName="pin"
-                    placeholder="Ex: 1234"
-                    class="w-full min-h-12 rounded-xl border border-stone-300 bg-white pl-3.5 pr-12 py-2.5 text-lg tracking-widest tabular-nums text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    (click)="showRegPin.set(!showRegPin())"
-                    aria-label="Mostrar ou ocultar PIN"
-                    class="absolute right-1 min-w-11 min-h-11 rounded-lg flex items-center justify-center text-ink-600 hover:text-pine-900 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-                  >
-                    <app-festive-icon [name]="showRegPin() ? 'eye-off' : 'eye'" svgClass="w-5 h-5" />
-                  </button>
-                </div>
-                @if (
-                  (registerForm.controls.pin.touched || registerForm.controls.pin.dirty) &&
-                  registerForm.controls.pin.invalid
-                ) {
-                  <p class="text-xs text-cranberry-700 font-medium mt-1">
-                    Digite apenas números de 4 a 6 dígitos (ex: 1234).
-                  </p>
-                }
-              </div>
-
-              <button
-                type="submit"
-                data-testid="register-submit"
-                [disabled]="isSubmitting()"
-                class="w-full min-h-12 rounded-xl bg-pine-800 hover:bg-pine-900 disabled:opacity-60 text-white font-bold text-base shadow-sm transition flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-              >
-                @if (isSubmitting()) {
-                  <app-festive-icon name="spinner" svgClass="w-5 h-5" />
-                  <span>Cadastrando...</span>
-                } @else {
-                  <span>Cadastrar e Ver Grupos</span>
-                }
-              </button>
-            </form>
-          } @else {
-            <form
-              [formGroup]="loginForm"
-              (ngSubmit)="submitLogin()"
-              data-testid="login-form"
-              class="space-y-4"
+          <div class="pt-2 border-t border-festive-border text-center">
+            <a
+              routerLink="/cadastro"
+              data-testid="go-to-register-link"
+              class="inline-flex items-center justify-center min-h-11 text-sm font-semibold text-pine-800 hover:text-pine-950 underline underline-offset-4"
             >
-              <div>
-                <label for="login-username" class="block text-sm font-semibold text-ink-900 mb-1.5">
-                  Seu Username
-                </label>
-                <input
-                  id="login-username"
-                  type="text"
-                  formControlName="username"
-                  placeholder="Ex: maria.silva"
-                  autocapitalize="none"
-                  class="w-full min-h-12 rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-base lowercase text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label for="login-pin" class="block text-sm font-semibold text-ink-900 mb-1.5">
-                  Seu PIN (4 a 6 dígitos)
-                </label>
-                <div class="relative flex items-center">
-                  <input
-                    id="login-pin"
-                    [type]="showLoginPin() ? 'text' : 'password'"
-                    inputmode="numeric"
-                    maxlength="6"
-                    formControlName="pin"
-                    placeholder="••••"
-                    class="w-full min-h-12 rounded-xl border border-stone-300 bg-white pl-3.5 pr-12 py-2.5 text-lg tracking-widest tabular-nums text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    (click)="showLoginPin.set(!showLoginPin())"
-                    aria-label="Mostrar ou ocultar PIN"
-                    class="absolute right-1 min-w-11 min-h-11 rounded-lg flex items-center justify-center text-ink-600 hover:text-pine-900 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-                  >
-                    <app-festive-icon [name]="showLoginPin() ? 'eye-off' : 'eye'" svgClass="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                data-testid="login-submit"
-                [disabled]="isSubmitting()"
-                class="w-full min-h-12 rounded-xl bg-pine-800 hover:bg-pine-900 disabled:opacity-60 text-white font-bold text-base shadow-sm transition flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-              >
-                @if (isSubmitting()) {
-                  <app-festive-icon name="spinner" svgClass="w-5 h-5" />
-                  <span>Entrando...</span>
-                } @else {
-                  <span>Entrar</span>
-                }
-              </button>
-            </form>
-          }
+              Não tem uma conta? Clique aqui
+            </a>
+          </div>
         </section>
       } @else {
         <!-- Compact Authenticated Identity Bar with discreet switch/logout button -->
@@ -274,7 +134,7 @@ import { formatParticipantCount, getAvatarTone, getInitials } from '../../shared
             type="button"
             data-testid="switch-family-user-btn"
             (click)="onSwitchFamilyUser()"
-            title="Cadastrar outro familiar ou trocar de usuário neste aparelho"
+            title="Trocar de usuário neste aparelho"
             aria-label="Trocar de perfil ou sair"
             class="min-h-11 px-3 py-1.5 rounded-xl bg-white/80 hover:bg-white border border-pine-200 text-pine-800 hover:text-pine-950 font-semibold text-xs inline-flex items-center gap-1.5 shrink-0 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
           >
@@ -317,26 +177,26 @@ import { formatParticipantCount, getAvatarTone, getInitials } from '../../shared
               (click)="openCreateGroupModal()"
               class="min-h-11 px-3.5 py-2 rounded-xl bg-pine-800 hover:bg-pine-900 text-white font-bold text-xs shadow-sm inline-flex items-center gap-1.5 shrink-0 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
             >
-              <span>+ Criar Grupo</span>
+              <span>+ Novo Amigo Secreto</span>
             </button>
           </div>
 
           @if (myGroups().length === 0) {
             <div class="bg-festive-card border border-festive-border rounded-2xl p-5 text-center space-y-3 shadow-sm">
               <p class="text-sm text-ink-600 leading-relaxed">
-                Você ainda não participa nem organiza nenhum grupo. Crie um novo grupo ou acesse pelo link de convite recebido no WhatsApp.
+                Você ainda não participa nem organiza nenhum grupo. Crie um novo Amigo Secreto ou acesse pelo link de convite recebido no WhatsApp.
               </p>
               <button
                 type="button"
                 (click)="openCreateGroupModal()"
                 class="min-h-11 px-4 py-2 rounded-xl bg-festive-cream hover:bg-gold-50 border border-festive-border text-pine-900 font-bold text-xs inline-flex items-center gap-1.5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
               >
-                <span>+ Criar Primeiro Grupo</span>
+                <span>+ Novo Amigo Secreto</span>
               </button>
             </div>
           } @else {
             <div class="space-y-3">
-              @for (group of myGroups(); track group.slug) {
+              @for (group of myGroups(); track group.id) {
                 <div
                   data-testid="my-group-card"
                   [attr.data-group-status]="group.status"
@@ -369,7 +229,7 @@ import { formatParticipantCount, getAvatarTone, getInitials } from '../../shared
 
                   <div class="flex flex-wrap gap-2">
                     <a
-                      [routerLink]="['/g', group.slug]"
+                      [routerLink]="['/g', group.id]"
                       data-testid="open-group-link"
                       [class]="
                         group.status === 'DRAWN'
@@ -386,7 +246,7 @@ import { formatParticipantCount, getAvatarTone, getInitials } from '../../shared
                     </a>
                     @if (group.organizer) {
                       <a
-                        [routerLink]="['/g', group.slug, 'admin']"
+                        [routerLink]="['/g', group.id, 'admin']"
                         data-testid="open-admin-link"
                         class="flex-1 min-h-12 rounded-xl bg-pine-800 hover:bg-pine-900 text-white font-semibold text-sm flex items-center justify-center px-3 shadow-sm transition"
                       >
@@ -413,7 +273,7 @@ import { formatParticipantCount, getAvatarTone, getInitials } from '../../shared
               <div class="flex items-start justify-between gap-2">
                 <div>
                   <h2 id="create-group-modal-title" class="font-display text-xl font-bold text-ink-900">
-                    Criar Novo Grupo
+                    Novo Amigo Secreto
                   </h2>
                   <p class="text-xs text-ink-600 mt-0.5">
                     Você será o organizador e poderá convidar os participantes pelo link.
@@ -440,18 +300,6 @@ import { formatParticipantCount, getAvatarTone, getInitials } from '../../shared
                 </div>
               }
 
-              <div class="flex flex-wrap gap-2">
-                @for (suggestion of groupNameSuggestions; track suggestion) {
-                  <button
-                    type="button"
-                    (click)="applyEventSuggestion(suggestion)"
-                    class="min-h-11 px-3 py-1.5 rounded-full bg-festive-cream hover:bg-gold-50 border border-festive-border hover:border-gold-300 text-xs font-semibold text-ink-900 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-                  >
-                    + {{ suggestion }}
-                  </button>
-                }
-              </div>
-
               <form
                 [formGroup]="createGroupForm"
                 (ngSubmit)="submitCreateGroup()"
@@ -471,6 +319,43 @@ import { formatParticipantCount, getAvatarTone, getInitials } from '../../shared
                   />
                 </div>
 
+                <div>
+                  <label for="group-pin" class="block text-sm font-semibold text-ink-900 mb-1.5">
+                    PIN de Entrada do Grupo (4 a 6 dígitos)
+                  </label>
+                  <div class="relative flex items-center">
+                    <input
+                      id="group-pin"
+                      data-testid="group-pin-input"
+                      [type]="showGroupPin() ? 'text' : 'password'"
+                      inputmode="numeric"
+                      maxlength="6"
+                      formControlName="groupPin"
+                      placeholder="Ex: 1234"
+                      class="w-full min-h-12 rounded-xl border border-stone-300 bg-white pl-3.5 pr-12 py-2.5 text-lg tracking-widest tabular-nums text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      (click)="showGroupPin.set(!showGroupPin())"
+                      aria-label="Mostrar ou ocultar PIN do grupo"
+                      class="absolute right-1 min-w-11 min-h-11 rounded-lg flex items-center justify-center text-ink-600 hover:text-pine-900 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                    >
+                      <app-festive-icon [name]="showGroupPin() ? 'eye-off' : 'eye'" svgClass="w-5 h-5" />
+                    </button>
+                  </div>
+                  <p class="text-xs text-ink-600 mt-1">
+                    Os participantes precisarão informar este PIN para entrar no grupo.
+                  </p>
+                  @if (
+                    (createGroupForm.controls.groupPin.touched || createGroupForm.controls.groupPin.dirty) &&
+                    createGroupForm.controls.groupPin.invalid
+                  ) {
+                    <p class="text-xs text-cranberry-700 font-medium mt-1">
+                      Informe um PIN numérico de 4 a 6 dígitos.
+                    </p>
+                  }
+                </div>
+
                 <div class="flex flex-col sm:flex-row gap-2">
                   <button
                     type="submit"
@@ -480,9 +365,9 @@ import { formatParticipantCount, getAvatarTone, getInitials } from '../../shared
                   >
                     @if (creatingGroup()) {
                       <app-festive-icon name="spinner" svgClass="w-4 h-4" />
-                      <span>Criando grupo...</span>
+                      <span>Criando...</span>
                     } @else {
-                      <span>Criar Grupo</span>
+                      <span>Criar Amigo Secreto</span>
                     }
                   </button>
                   <button
@@ -506,9 +391,8 @@ export class HomeGroupsPageComponent implements OnInit {
   private readonly apiService = inject(SecretSantaApiService);
   private readonly fb = inject(NonNullableFormBuilder);
 
-  readonly authMode = signal<'register' | 'login'>('register');
-  readonly showRegPin = signal<boolean>(false);
   readonly showLoginPin = signal<boolean>(false);
+  readonly showGroupPin = signal<boolean>(false);
   readonly myGroups = signal<GroupSummaryView[]>([]);
   readonly isSubmitting = signal<boolean>(false);
   readonly creatingGroup = signal<boolean>(false);
@@ -516,27 +400,14 @@ export class HomeGroupsPageComponent implements OnInit {
   readonly errorMessage = signal<string | null>(null);
   readonly statusMessage = signal<string | null>(null);
 
-  readonly groupNameSuggestions = [
-    'Natal da Família 2026',
-    'Amigo Secreto dos Primos',
-    'Ceia de Natal em Casa'
-  ] as const;
-
-  private usernameManuallyEdited = false;
-
-  readonly registerForm = this.fb.group({
-    name: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(60)]],
-    username: ['', [Validators.required, Validators.pattern(/^[a-z0-9._-]{3,30}$/)]],
-    pin: ['', [Validators.required, Validators.pattern(/^\d{4,6}$/)]]
-  });
-
   readonly loginForm = this.fb.group({
     username: ['', [Validators.required, Validators.pattern(/^[a-z0-9._-]{3,30}$/)]],
     pin: ['', [Validators.required, Validators.pattern(/^\d{4,6}$/)]]
   });
 
   readonly createGroupForm = this.fb.group({
-    eventName: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(100)]]
+    eventName: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(100)]],
+    groupPin: ['', [Validators.required, Validators.pattern(/^\d{4,6}$/)]]
   });
 
   constructor() {
@@ -567,81 +438,15 @@ export class HomeGroupsPageComponent implements OnInit {
 
   openCreateGroupModal(): void {
     this.errorMessage.set(null);
+    this.showGroupPin.set(false);
     this.isCreateGroupModalOpen.set(true);
   }
 
   closeCreateGroupModal(): void {
     this.isCreateGroupModalOpen.set(false);
     this.errorMessage.set(null);
+    this.showGroupPin.set(false);
     this.createGroupForm.reset();
-  }
-
-  applyEventSuggestion(suggestion: string): void {
-    this.createGroupForm.controls.eventName.setValue(suggestion);
-  }
-
-  setAuthMode(mode: 'register' | 'login'): void {
-    this.authMode.set(mode);
-    this.errorMessage.set(null);
-  }
-
-  onNameInput(): void {
-    if (this.usernameManuallyEdited) {
-      return;
-    }
-    const rawName = this.registerForm.controls.name.value;
-    const suggested = HomeGroupsPageComponent.suggestUsername(rawName);
-    this.registerForm.controls.username.setValue(suggested, { emitEvent: false });
-  }
-
-  onUsernameManualEdit(): void {
-    this.usernameManuallyEdited = true;
-  }
-
-  submitRegister(): void {
-    this.errorMessage.set(null);
-    const { name, username, pin } = this.registerForm.getRawValue();
-    const trimmedName = name.trim();
-    const normalizedUsername = username.trim().toLowerCase();
-
-    if (
-      trimmedName.length < 2 ||
-      trimmedName.length > 60 ||
-      !/^[a-z0-9._-]{3,30}$/.test(normalizedUsername) ||
-      !/^\d{4,6}$/.test(pin)
-    ) {
-      this.errorMessage.set(
-        'Preencha um nome válido (2-60 caracteres), username (3-30 caracteres) e PIN numérico de 4 a 6 dígitos.'
-      );
-      return;
-    }
-
-    this.isSubmitting.set(true);
-    this.apiService
-      .register({
-        name: trimmedName,
-        username: normalizedUsername,
-        pin
-      })
-      .subscribe({
-        next: (session) => {
-          this.isSubmitting.set(false);
-          this.showRegPin.set(false);
-          this.registerForm.reset();
-          this.usernameManuallyEdited = false;
-          this.authStore.setSession(session);
-        },
-        error: (err: HttpErrorResponse) => {
-          this.isSubmitting.set(false);
-          if (err.status === 409) {
-            this.errorMessage.set(
-              'Este username já está em uso. Sugerimos adicionar um sobrenome ou número ao username.'
-            );
-          } else {
-            this.errorMessage.set('Não foi possível concluir o cadastro. Verifique os dados informados.');
-          }
-        }
-      });
   }
 
   submitLogin(): void {
@@ -650,7 +455,7 @@ export class HomeGroupsPageComponent implements OnInit {
     const normalizedUsername = username.trim().toLowerCase();
 
     if (!/^[a-z0-9._-]{3,30}$/.test(normalizedUsername) || !/^\d{4,6}$/.test(pin)) {
-      this.errorMessage.set('Informe seu username e um PIN numérico de 4 a 6 dígitos.');
+      this.errorMessage.set('Informe seu nome de usuário e um PIN numérico de 4 a 6 dígitos.');
       return;
     }
 
@@ -669,7 +474,7 @@ export class HomeGroupsPageComponent implements OnInit {
         },
         error: () => {
           this.isSubmitting.set(false);
-          this.errorMessage.set('Usuário ou PIN incorreto.');
+          this.errorMessage.set('Nome de usuário ou PIN incorreto.');
         }
       });
   }
@@ -692,18 +497,25 @@ export class HomeGroupsPageComponent implements OnInit {
     this.errorMessage.set(null);
     this.statusMessage.set(null);
     const eventName = this.createGroupForm.controls.eventName.value.trim();
+    const groupPin = this.createGroupForm.controls.groupPin.value.trim();
 
     if (eventName.length < 3 || eventName.length > 100) {
       this.errorMessage.set('O nome do evento deve ter entre 3 e 100 caracteres.');
       return;
     }
 
+    if (!/^\d{4,6}$/.test(groupPin)) {
+      this.errorMessage.set('Informe um PIN numérico de 4 a 6 dígitos para o grupo.');
+      return;
+    }
+
     this.isSubmitting.set(true);
     this.creatingGroup.set(true);
-    this.apiService.createGroup({ eventName }).subscribe({
+    this.apiService.createGroup({ eventName, groupPin }).subscribe({
       next: (created) => {
         this.isSubmitting.set(false);
         this.creatingGroup.set(false);
+        this.showGroupPin.set(false);
         this.createGroupForm.reset();
         this.isCreateGroupModalOpen.set(false);
         this.statusMessage.set(`Grupo "${created.eventName}" criado com sucesso!`);
@@ -723,22 +535,8 @@ export class HomeGroupsPageComponent implements OnInit {
     this.isCreateGroupModalOpen.set(false);
     this.errorMessage.set(null);
     this.statusMessage.set(null);
-    this.showRegPin.set(false);
     this.showLoginPin.set(false);
-    this.registerForm.reset();
+    this.showGroupPin.set(false);
     this.loginForm.reset();
-    this.usernameManuallyEdited = false;
-    this.authMode.set('register');
-  }
-
-  static suggestUsername(rawName: string): string {
-    return rawName
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, '.')
-      .replace(/^\.+|\.+$/g, '')
-      .slice(0, 30);
   }
 }

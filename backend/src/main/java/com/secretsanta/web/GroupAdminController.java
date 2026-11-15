@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -36,50 +37,70 @@ public class GroupAdminController {
     @ResponseStatus(HttpStatus.CREATED)
     public AdminGroupView createGroup(
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader,
-            @RequestBody CreateGroupRequest request) {
+            @RequestBody(required = false) CreateGroupRequest request) {
         AuthenticatedUser user = tokenService.parseAndValidate(authorizationHeader);
         String eventName = request != null ? request.eventName() : null;
-        return applicationService.createGroup(user.userId(), eventName);
+        String groupPin = request != null ? request.groupPin() : null;
+        return applicationService.createGroup(user.userId(), eventName, groupPin);
     }
 
-    @GetMapping("/{slug}/admin")
+    @GetMapping("/{groupId}/admin")
     @ResponseStatus(HttpStatus.OK)
     public AdminGroupView getAdminGroup(
-            @PathVariable("slug") String slug,
+            @PathVariable("groupId") String groupIdRaw,
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader) {
+        UUID groupId = GroupPublicController.parseGroupId(groupIdRaw);
         AuthenticatedUser user = tokenService.parseAndValidate(authorizationHeader);
-        return applicationService.getAdminGroup(slug, user.userId());
+        return applicationService.getAdminGroup(groupId, user.userId());
     }
 
-    @DeleteMapping("/{slug}/admin/participants/{participantId}")
+    @PutMapping("/{groupId}/admin/pin")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void updateGroupPin(
+            @PathVariable("groupId") String groupIdRaw,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader,
+            @RequestBody(required = false) UpdateGroupPinRequest request) {
+        UUID groupId = GroupPublicController.parseGroupId(groupIdRaw);
+        AuthenticatedUser user = tokenService.parseAndValidate(authorizationHeader);
+        String groupPin = request != null ? request.groupPin() : null;
+        applicationService.updateGroupPin(groupId, user.userId(), groupPin);
+    }
+
+    @DeleteMapping("/{groupId}/admin/participants/{participantId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void removeParticipant(
-            @PathVariable("slug") String slug,
+            @PathVariable("groupId") String groupIdRaw,
             @PathVariable("participantId") UUID participantId,
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader) {
+        UUID groupId = GroupPublicController.parseGroupId(groupIdRaw);
         AuthenticatedUser user = tokenService.parseAndValidate(authorizationHeader);
-        applicationService.removeParticipant(slug, user.userId(), participantId);
+        applicationService.removeParticipant(groupId, user.userId(), participantId);
     }
 
-    @PostMapping("/{slug}/admin/draw")
+    @PostMapping("/{groupId}/admin/draw")
     @ResponseStatus(HttpStatus.OK)
     public AdminGroupView executeDraw(
-            @PathVariable("slug") String slug,
+            @PathVariable("groupId") String groupIdRaw,
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader) {
+        UUID groupId = GroupPublicController.parseGroupId(groupIdRaw);
         AuthenticatedUser user = tokenService.parseAndValidate(authorizationHeader);
-        return applicationService.executeDraw(slug, user.userId());
+        return applicationService.executeDraw(groupId, user.userId());
     }
 
-    @PostMapping("/{slug}/admin/participants/{participantId}/reset-token")
+    @PostMapping("/{groupId}/admin/participants/{participantId}/reset-token")
     @ResponseStatus(HttpStatus.OK)
     public PasswordResetLinkView generatePasswordResetToken(
-            @PathVariable("slug") String slug,
+            @PathVariable("groupId") String groupIdRaw,
             @PathVariable("participantId") UUID participantId,
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader) {
+        UUID groupId = GroupPublicController.parseGroupId(groupIdRaw);
         AuthenticatedUser user = tokenService.parseAndValidate(authorizationHeader);
-        return applicationService.generatePasswordResetToken(slug, user.userId(), participantId);
+        return applicationService.generatePasswordResetToken(groupId, user.userId(), participantId);
     }
 
-    public record CreateGroupRequest(String eventName) {
+    public record CreateGroupRequest(String eventName, String groupPin) {
+    }
+
+    public record UpdateGroupPinRequest(String groupPin) {
     }
 }

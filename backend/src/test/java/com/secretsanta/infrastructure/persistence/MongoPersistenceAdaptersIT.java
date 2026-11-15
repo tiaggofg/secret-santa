@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.secretsanta.config.MongoTestContainerConfig;
 import com.secretsanta.domain.model.GeoCoordinates;
-import com.secretsanta.domain.model.GroupSlug;
 import com.secretsanta.domain.model.GroupStatus;
 import com.secretsanta.domain.model.Participant;
 import com.secretsanta.domain.model.ParticipantName;
@@ -106,7 +105,7 @@ class MongoPersistenceAdaptersIT {
         UUID organizerId = UUID.randomUUID();
         SecretSantaGroup group = SecretSantaGroup.create(
                 "Natal da Família",
-                new GroupSlug("natal-da-familia-2026"),
+                new PinHash("$2a$10$groupPinHash1"),
                 organizerId,
                 NOW);
 
@@ -136,9 +135,10 @@ class MongoPersistenceAdaptersIT {
         SecretSantaGroup saved = groupRepository.save(group);
         assertThat(saved.version()).isNotNull();
 
-        SecretSantaGroup loaded = groupRepository.findByPublicSlug(new GroupSlug("natal-da-familia-2026")).orElseThrow();
+        SecretSantaGroup loaded = groupRepository.findById(group.id()).orElseThrow();
         assertThat(loaded.id()).isEqualTo(group.id());
         assertThat(loaded.eventName()).isEqualTo("Natal da Família");
+        assertThat(loaded.groupPinHash().value()).isEqualTo("$2a$10$groupPinHash1");
         assertThat(loaded.organizerUserId()).isEqualTo(organizerId);
         assertThat(loaded.status()).isEqualTo(GroupStatus.DRAWN);
         assertThat(loaded.drawnAt()).isEqualTo(NOW.plusSeconds(300));
@@ -152,30 +152,11 @@ class MongoPersistenceAdaptersIT {
     }
 
     @Test
-    void shouldEnforceUniquePublicSlugIndexInSecretSantaGroupsCollection() {
-        SecretSantaGroup g1 = SecretSantaGroup.create(
-                "Evento 1",
-                new GroupSlug("slug-unico-123"),
-                UUID.randomUUID(),
-                NOW);
-        groupRepository.save(g1);
-
-        SecretSantaGroup g2 = SecretSantaGroup.create(
-                "Evento 2",
-                new GroupSlug("slug-unico-123"),
-                UUID.randomUUID(),
-                NOW);
-
-        assertThatThrownBy(() -> groupRepository.save(g2))
-                .isInstanceOf(DuplicateKeyException.class);
-    }
-
-    @Test
     void shouldRejectConcurrentStaleWritesWithOptimisticLockingFailureException() {
         UUID organizerId = UUID.randomUUID();
         SecretSantaGroup created = groupRepository.save(SecretSantaGroup.create(
                 "Natal Concorrente",
-                new GroupSlug("natal-concorrente"),
+                new PinHash("$2a$10$groupPinHash2"),
                 organizerId,
                 NOW));
 
@@ -202,23 +183,39 @@ class MongoPersistenceAdaptersIT {
     }
 
     @Test
-    void shouldFindAllGroupsOrderedByCreatedAtDesc() {
-        SecretSantaGroup older = SecretSantaGroup.create(
-                "Grupo Antigo",
-                new GroupSlug("grupo-antigo"),
-                UUID.randomUUID(),
+    void shouldFindOnlyUserOrganizedOrParticipatedGroupsOrderedByCreatedAtDesc() {
+        UUID userId = UUID.randomUUID();
+        UUID otherUserId = UUID.randomUUID();
+
+        SecretSantaGroup organizedOlder = SecretSantaGroup.create(
+                "Grupo Organizado",
+                new PinHash("$2a$10$hash1"),
+                userId,
                 NOW);
-        SecretSantaGroup newer = SecretSantaGroup.create(
-                "Grupo Novo",
-                new GroupSlug("grupo-novo"),
-                UUID.randomUUID(),
+        SecretSantaGroup participatedNewer = SecretSantaGroup.create(
+                "Grupo Participante",
+                new PinHash("$2a$10$hash2"),
+                otherUserId,
                 NOW.plusSeconds(120));
+        participatedNewer.registerParticipant(
+                userId,
+                new ParticipantName("Convidado"),
+                new Username("convidado"),
+                null,
+                NOW.plusSeconds(130));
+        SecretSantaGroup thirdPartyGroup = SecretSantaGroup.create(
+                "Grupo Terceiros",
+                new PinHash("$2a$10$hash3"),
+                otherUserId,
+                NOW.plusSeconds(240));
 
-        groupRepository.save(older);
-        groupRepository.save(newer);
+        groupRepository.save(organizedOlder);
+        groupRepository.save(participatedNewer);
+        groupRepository.save(thirdPartyGroup);
 
-        List<SecretSantaGroup> all = groupRepository.findAllOrderByCreatedAtDesc();
-        assertThat(all).extracting(g -> g.publicSlug().value())
-                .containsExactly("grupo-novo", "grupo-antigo");
+        List<SecretSantaGroup> userGroups = groupRepository
+                .findByUserParticipationOrOrganizationOrderByCreatedAtDesc(userId);
+        assertThat(userGroups).extracting(SecretSantaGroup::eventName)
+                .containsExactly("Grupo Participante", "Grupo Organizado");
     }
 }

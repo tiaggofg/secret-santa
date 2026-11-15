@@ -7,6 +7,7 @@ import com.secretsanta.domain.exception.GroupAlreadyDrawnException;
 import com.secretsanta.domain.exception.GroupNotDrawnYetException;
 import com.secretsanta.domain.exception.InsufficientParticipantsForDrawException;
 import com.secretsanta.domain.exception.InvalidCredentialsException;
+import com.secretsanta.domain.exception.InvalidGroupPinException;
 import com.secretsanta.domain.exception.InvalidPasswordResetTokenException;
 import com.secretsanta.domain.exception.ResourceNotFoundException;
 import com.secretsanta.domain.exception.UnauthorizedOrganizerAccessException;
@@ -80,6 +81,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidCredentialsException.class)
     public ProblemDetail handleInvalidCredentials(InvalidCredentialsException ex) {
         return buildProblem(HttpStatus.UNAUTHORIZED, "Unauthorized", ex.getMessage(), "INVALID_CREDENTIALS");
+    }
+
+    @ExceptionHandler(InvalidGroupPinException.class)
+    public ProblemDetail handleInvalidGroupPin(InvalidGroupPinException ex) {
+        return buildProblem(HttpStatus.FORBIDDEN, "Forbidden", ex.getMessage(), "INVALID_GROUP_PIN");
     }
 
     @ExceptionHandler(UnauthorizedOrganizerAccessException.class)

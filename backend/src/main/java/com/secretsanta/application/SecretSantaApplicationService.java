@@ -4,10 +4,10 @@ import com.secretsanta.domain.exception.DomainValidationException;
 import com.secretsanta.domain.exception.DuplicateUsernameException;
 import com.secretsanta.domain.exception.GroupNotDrawnYetException;
 import com.secretsanta.domain.exception.InvalidCredentialsException;
+import com.secretsanta.domain.exception.InvalidGroupPinException;
 import com.secretsanta.domain.exception.InvalidPasswordResetTokenException;
 import com.secretsanta.domain.exception.ResourceNotFoundException;
 import com.secretsanta.domain.model.GeoCoordinates;
-import com.secretsanta.domain.model.GroupSlug;
 import com.secretsanta.domain.model.GroupStatus;
 import com.secretsanta.domain.model.Participant;
 import com.secretsanta.domain.model.ParticipantName;
@@ -139,56 +139,63 @@ public class SecretSantaApplicationService {
         if (userId == null) {
             throw new InvalidCredentialsException("Authentication is required to list groups");
         }
-        List<SecretSantaGroup> allGroups = groupRepository.findAllOrderByCreatedAtDesc();
-
-        List<GroupSummaryView> myGroups = allGroups.stream()
-                .filter(g -> g.isOrganizer(userId) || g.hasParticipantWithUserId(userId))
+        List<GroupSummaryView> myGroups = groupRepository
+                .findByUserParticipationOrOrganizationOrderByCreatedAtDesc(userId)
+                .stream()
                 .map(g -> toGroupSummaryView(g, userId))
                 .toList();
 
-        List<GroupSummaryView> availableGroups = allGroups.stream()
-                .filter(g -> g.status() == GroupStatus.OPEN && !g.hasParticipantWithUserId(userId))
-                .map(g -> toGroupSummaryView(g, userId))
-                .toList();
-
-        return new GroupDiscoveryView(myGroups, availableGroups);
+        return new GroupDiscoveryView(myGroups);
     }
 
-    public AdminGroupView createGroup(UUID organizerUserId, String eventName) {
+    public AdminGroupView createGroup(UUID organizerUserId, String eventName, String rawGroupPin) {
         if (organizerUserId == null) {
             throw new InvalidCredentialsException("Authentication is required to create a group");
         }
         userAccountRepository.findById(organizerUserId)
                 .orElseThrow(() -> new InvalidCredentialsException("Authenticated user account not found"));
 
+        PinValidator.validateRawPin(rawGroupPin);
+        PinHash groupPinHash = new PinHash(passwordEncoder.encode(rawGroupPin));
         Instant now = Instant.now(clock);
-        GroupSlug slug = generateUniqueSlug(eventName);
-        SecretSantaGroup group = SecretSantaGroup.create(eventName, slug, organizerUserId, now);
+        SecretSantaGroup group = SecretSantaGroup.create(eventName, groupPinHash, organizerUserId, now);
         SecretSantaGroup saved = groupRepository.save(group);
         return toAdminGroupView(saved);
     }
 
-    public PublicGroupView getPublicGroup(String slugValue) {
-        return getPublicGroup(slugValue, null);
+    public PublicGroupView getPublicGroup(UUID groupId) {
+        return getPublicGroup(groupId, null);
     }
 
-    public PublicGroupView getPublicGroup(String slugValue, UUID currentUserId) {
-        SecretSantaGroup group = loadGroupBySlug(slugValue);
+    public PublicGroupView getPublicGroup(UUID groupId, UUID currentUserId) {
+        SecretSantaGroup group = loadGroupById(groupId);
         return toPublicGroupView(group, currentUserId);
     }
 
-    public AdminGroupView getAdminGroup(String slugValue, UUID requesterUserId) {
+    public AdminGroupView getAdminGroup(UUID groupId, UUID requesterUserId) {
         if (requesterUserId == null) {
             throw new InvalidCredentialsException("Authentication is required for group administration");
         }
-        SecretSantaGroup group = loadGroupBySlug(slugValue);
+        SecretSantaGroup group = loadGroupById(groupId);
         group.assertOrganizer(requesterUserId);
         return toAdminGroupView(group);
     }
 
+    public void updateGroupPin(UUID groupId, UUID requesterUserId, String newRawGroupPin) {
+        if (requesterUserId == null) {
+            throw new InvalidCredentialsException("Authentication is required for group administration");
+        }
+        PinValidator.validateRawPin(newRawGroupPin);
+        SecretSantaGroup group = loadGroupById(groupId);
+        group.assertOrganizer(requesterUserId);
+        group.updateGroupPinHash(new PinHash(passwordEncoder.encode(newRawGroupPin)));
+        groupRepository.save(group);
+    }
+
     public ParticipantRegistrationView registerParticipant(
-            String slugValue,
+            UUID groupId,
             UUID userId,
+            String rawGroupPin,
             Double latitude,
             Double longitude) {
         if (userId == null) {
@@ -198,41 +205,49 @@ public class SecretSantaApplicationService {
                 .orElseThrow(() -> new InvalidCredentialsException("Authenticated user account not found"));
 
         GeoCoordinates coordinates = buildCoordinates(latitude, longitude);
-        return registerParticipantWithOptimisticRetry(slugValue, user, coordinates, null);
+        return registerParticipantWithOptimisticRetry(groupId, user, rawGroupPin, coordinates, null);
     }
 
     public ParticipantRegistrationView registerVisitorAndJoinGroup(
-            String slugValue,
+            UUID groupId,
             String name,
             String username,
             String rawPin,
+            String rawGroupPin,
             Double latitude,
             Double longitude) {
         GeoCoordinates coordinates = buildCoordinates(latitude, longitude);
-        // Verify the group exists before creating a user account
-        loadGroupBySlug(slugValue);
+        SecretSantaGroup group = loadGroupById(groupId);
 
         final AuthSessionView authSession;
         if (name != null && !name.isBlank()) {
+            verifyGroupPin(group, rawGroupPin);
             authSession = registerUser(name, username, rawPin);
         } else {
             authSession = loginUser(username, rawPin);
+            if (!group.isOrganizer(authSession.userId())) {
+                verifyGroupPin(group, rawGroupPin);
+            }
         }
 
         UserAccount user = userAccountRepository.findById(authSession.userId())
                 .orElseThrow(() -> new InvalidCredentialsException("Authenticated user account not found"));
-        return registerParticipantWithOptimisticRetry(slugValue, user, coordinates, authSession.token());
+        return registerParticipantWithOptimisticRetry(groupId, user, rawGroupPin, coordinates, authSession.token());
     }
 
     private ParticipantRegistrationView registerParticipantWithOptimisticRetry(
-            String slugValue,
+            UUID groupId,
             UserAccount user,
+            String rawGroupPin,
             GeoCoordinates coordinates,
             String issuedToken) {
         OptimisticLockingFailureException lastFailure = null;
         for (int attempt = 1; attempt <= MAX_OPTIMISTIC_LOCK_RETRIES; attempt++) {
             try {
-                SecretSantaGroup group = loadGroupBySlug(slugValue);
+                SecretSantaGroup group = loadGroupById(groupId);
+                if (!group.isOrganizer(user.id())) {
+                    verifyGroupPin(group, rawGroupPin);
+                }
                 Instant now = Instant.now(clock);
                 Participant participant = group.registerParticipant(
                         user.id(),
@@ -250,7 +265,8 @@ public class SecretSantaApplicationService {
                         savedParticipant.hasGeoLocation(),
                         savedParticipant.revealStatus(savedGroup.status()),
                         savedParticipant.createdAt(),
-                        savedGroup.publicSlug().value(),
+                        savedGroup.id(),
+                        "/g/" + savedGroup.id(),
                         issuedToken);
             } catch (OptimisticLockingFailureException ex) {
                 lastFailure = ex;
@@ -259,24 +275,24 @@ public class SecretSantaApplicationService {
         throw lastFailure;
     }
 
-    public void removeParticipant(String slugValue, UUID requesterUserId, UUID participantId) {
+    public void removeParticipant(UUID groupId, UUID requesterUserId, UUID participantId) {
         if (requesterUserId == null) {
             throw new InvalidCredentialsException("Authentication is required for group administration");
         }
         if (participantId == null) {
             throw new DomainValidationException("Participant ID must not be null");
         }
-        SecretSantaGroup group = loadGroupBySlug(slugValue);
+        SecretSantaGroup group = loadGroupById(groupId);
         group.assertOrganizer(requesterUserId);
         group.removeParticipant(participantId);
         groupRepository.save(group);
     }
 
-    public AdminGroupView executeDraw(String slugValue, UUID requesterUserId) {
+    public AdminGroupView executeDraw(UUID groupId, UUID requesterUserId) {
         if (requesterUserId == null) {
             throw new InvalidCredentialsException("Authentication is required for group administration");
         }
-        SecretSantaGroup group = loadGroupBySlug(slugValue);
+        SecretSantaGroup group = loadGroupById(groupId);
         group.assertOrganizer(requesterUserId);
         Instant now = Instant.now(clock);
         group.executeDraw(clusterService, drawService, now);
@@ -285,7 +301,7 @@ public class SecretSantaApplicationService {
     }
 
     public PasswordResetLinkView generatePasswordResetToken(
-            String slugValue,
+            UUID groupId,
             UUID requesterUserId,
             UUID participantId) {
         if (requesterUserId == null) {
@@ -294,7 +310,7 @@ public class SecretSantaApplicationService {
         if (participantId == null) {
             throw new DomainValidationException("Participant ID must not be null");
         }
-        SecretSantaGroup group = loadGroupBySlug(slugValue);
+        SecretSantaGroup group = loadGroupById(groupId);
         group.assertOrganizer(requesterUserId);
         Participant participant = group.findParticipantById(participantId);
 
@@ -338,11 +354,11 @@ public class SecretSantaApplicationService {
         return new PinResetResultView(userAccount.id(), userAccount.username().value(), "PIN updated successfully");
     }
 
-    public RevealMatchView revealMatch(String slugValue, String usernameValue, String rawPin) {
+    public RevealMatchView revealMatch(UUID groupId, String usernameValue, String rawPin) {
         OptimisticLockingFailureException lastFailure = null;
         for (int attempt = 1; attempt <= MAX_OPTIMISTIC_LOCK_RETRIES; attempt++) {
             try {
-                SecretSantaGroup group = loadGroupBySlug(slugValue);
+                SecretSantaGroup group = loadGroupById(groupId);
                 if (group.status() != GroupStatus.DRAWN) {
                     throw new GroupNotDrawnYetException("The Secret Santa draw has not been executed yet");
                 }
@@ -389,35 +405,20 @@ public class SecretSantaApplicationService {
         throw lastFailure;
     }
 
-    private SecretSantaGroup loadGroupBySlug(String slugValue) {
-        if (slugValue == null || slugValue.isBlank()) {
+    private SecretSantaGroup loadGroupById(UUID groupId) {
+        if (groupId == null) {
             throw new ResourceNotFoundException("Group not found");
         }
-        final GroupSlug slug;
-        try {
-            slug = new GroupSlug(slugValue);
-        } catch (DomainValidationException ex) {
-            throw new ResourceNotFoundException("Group not found: " + slugValue);
-        }
-        return groupRepository.findByPublicSlug(slug)
-                .orElseThrow(() -> new ResourceNotFoundException("Group not found: " + slug.value()));
+        return groupRepository.findById(groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("Group not found: " + groupId));
     }
 
-    private GroupSlug generateUniqueSlug(String eventName) {
-        // Validate eventName first so invalid eventName throws DomainValidationException with clear message
-        if (eventName == null || eventName.trim().length() < 3 || eventName.trim().length() > 100) {
-            throw new DomainValidationException("Event name must be between 3 and 100 characters");
+    private void verifyGroupPin(SecretSantaGroup group, String rawGroupPin) {
+        if (rawGroupPin == null
+                || rawGroupPin.isBlank()
+                || !passwordEncoder.matches(rawGroupPin, group.groupPinHash().value())) {
+            throw new InvalidGroupPinException("Invalid group PIN");
         }
-        for (int attempt = 0; attempt < 10; attempt++) {
-            byte[] suffixBytes = new byte[3];
-            secureRandom.nextBytes(suffixBytes);
-            String suffix = HexFormat.of().formatHex(suffixBytes);
-            GroupSlug candidate = GroupSlug.fromEventNameAndSuffix(eventName, suffix);
-            if (!groupRepository.existsByPublicSlug(candidate)) {
-                return candidate;
-            }
-        }
-        return GroupSlug.fromEventNameAndSuffix(eventName, UUID.randomUUID().toString().substring(0, 8));
     }
 
     private static GeoCoordinates buildCoordinates(Double latitude, Double longitude) {
@@ -441,26 +442,22 @@ public class SecretSantaApplicationService {
     }
 
     private static GroupSummaryView toGroupSummaryView(SecretSantaGroup group, UUID userId) {
-        String slug = group.publicSlug().value();
         boolean isOrganizer = group.isOrganizer(userId);
         boolean joined = group.hasParticipantWithUserId(userId);
         return new GroupSummaryView(
                 group.id(),
-                slug,
-                slug,
                 group.eventName(),
                 group.organizerUserId(),
                 group.status(),
                 group.participants().size(),
                 isOrganizer,
                 joined,
-                "/g/" + slug,
+                "/g/" + group.id(),
                 group.createdAt(),
                 group.drawnAt());
     }
 
     private static AdminGroupView toAdminGroupView(SecretSantaGroup group) {
-        String slug = group.publicSlug().value();
         List<AdminParticipantView> participants = group.participants().stream()
                 .map(p -> new AdminParticipantView(
                         p.id(),
@@ -473,43 +470,43 @@ public class SecretSantaApplicationService {
                 .toList();
         return new AdminGroupView(
                 group.id(),
-                slug,
-                slug,
                 group.eventName(),
                 group.organizerUserId(),
                 group.status(),
                 group.geographicRestrictionRelaxed(),
-                "/g/" + slug,
+                "/g/" + group.id(),
                 group.createdAt(),
                 group.drawnAt(),
                 participants);
     }
 
     private static PublicGroupView toPublicGroupView(SecretSantaGroup group, UUID currentUserId) {
-        String slug = group.publicSlug().value();
         boolean isOrganizer = group.isOrganizer(currentUserId);
         boolean joined = group.hasParticipantWithUserId(currentUserId);
-        List<PublicParticipantView> participants = group.participants().stream()
-                .map(p -> new PublicParticipantView(
-                        p.id(),
-                        p.userId(),
-                        p.name().value(),
-                        p.username().value(),
-                        p.hasGeoLocation(),
-                        p.revealStatus(group.status()),
-                        p.createdAt()))
-                .toList();
+        boolean participantsVisible = isOrganizer || joined;
+        List<PublicParticipantView> participants = participantsVisible
+                ? group.participants().stream()
+                        .map(p -> new PublicParticipantView(
+                                p.id(),
+                                p.userId(),
+                                p.name().value(),
+                                p.username().value(),
+                                p.hasGeoLocation(),
+                                p.revealStatus(group.status()),
+                                p.createdAt()))
+                        .toList()
+                : List.of();
         return new PublicGroupView(
                 group.id(),
-                slug,
-                slug,
                 group.eventName(),
                 group.organizerUserId(),
                 group.status(),
                 group.geographicRestrictionRelaxed(),
-                "/g/" + slug,
+                "/g/" + group.id(),
                 isOrganizer,
                 joined,
+                participantsVisible,
+                group.participants().size(),
                 group.createdAt(),
                 group.drawnAt(),
                 participants);
@@ -524,8 +521,6 @@ public class SecretSantaApplicationService {
 
     public record GroupSummaryView(
             UUID id,
-            String slug,
-            String publicSlug,
             String eventName,
             UUID organizerUserId,
             GroupStatus status,
@@ -538,8 +533,7 @@ public class SecretSantaApplicationService {
     }
 
     public record GroupDiscoveryView(
-            List<GroupSummaryView> myGroups,
-            List<GroupSummaryView> availableGroups) {
+            List<GroupSummaryView> myGroups) {
     }
 
     public record AdminParticipantView(
@@ -554,8 +548,6 @@ public class SecretSantaApplicationService {
 
     public record AdminGroupView(
             UUID id,
-            String slug,
-            String publicSlug,
             String eventName,
             UUID organizerUserId,
             GroupStatus status,
@@ -578,8 +570,6 @@ public class SecretSantaApplicationService {
 
     public record PublicGroupView(
             UUID id,
-            String slug,
-            String publicSlug,
             String eventName,
             UUID organizerUserId,
             GroupStatus status,
@@ -587,6 +577,8 @@ public class SecretSantaApplicationService {
             String sharePath,
             boolean organizer,
             boolean joined,
+            boolean participantsVisible,
+            int participantCount,
             Instant createdAt,
             Instant drawnAt,
             List<PublicParticipantView> participants) {
@@ -600,7 +592,8 @@ public class SecretSantaApplicationService {
             boolean hasGeoLocation,
             RevealStatus revealStatus,
             Instant createdAt,
-            String groupSlug,
+            UUID groupId,
+            String sharePath,
             String token) {
     }
 

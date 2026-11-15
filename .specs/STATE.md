@@ -50,13 +50,21 @@
 - **Date**: 2026-11-15
 - **Status**: active
 
+### AD-007
+- **Decision**: Substituir `publicSlug` por `UUID` como identificador único dos grupos (`/g/{uuid}` e `/g/{uuid}/admin`), exigir **PIN numérico de 4 a 6 dígitos (`groupPinHash` BCrypt)** na criação e no ingresso de participantes (dispensado apenas para o próprio organizador ao entrar no seu grupo, com redefinição pelo organizador via `PUT /api/v1/groups/{groupId}/admin/pin`), ocultar a lista de participantes para não-membros (`participantsVisible: false`), remover `availableOpenGroups` da API/Home, adotar login direto em `/` + página dedicada `/cadastro` e substituir todas as referências visíveis de `username` por `nome de usuário`.
+- **Reason**: Torna os grupos privados por padrão, elimina enumeração por slug ou exposição de participantes a terceiros, evita criação de contas órfãs ao validar o grupo e o PIN antes de cadastrar visitantes e simplifica a UX mobile-first de entrada e cadastro.
+- **Trade-off**: O organizador precisa informar o PIN do grupo separadamente aos convidados ao compartilhar o link `/g/{uuid}`.
+- **Scope**: Domínio, Persistência MongoDB (índices em `organizerUserId` e `participants.userId`, remoção do índice de `publicSlug`), API REST `/api/v1/groups` e Frontend Angular.
+- **Date**: 2026-11-15
+- **Status**: active
+
 ## Handoff
 
-- **Feature**: festive-ui-ux (`.specs/features/festive-ui-ux`)
-- **Phase / Task**: Done — redesign natalino + ajustes da Home (`F1`..`F8`) concluídos e validados via Vitest (`37 pass`), `ng build` e Playwright E2E
-- **Completed**: `F1`..`F8`, `.specs/features/festive-ui-ux/spec.md`, `.specs/features/festive-ui-ux/tasks.md`
+- **Feature**: private-groups-ux-patch (`.specs/features/private-groups-ux-patch`)
+- **Phase / Task**: Done — Implementação integral da spec concluída e validada (`mvn test`: 82 pass; `npm test`: 38 pass; `ng build`: ok; Playwright E2E desktop + mobile: pass)
+- **Completed**: `B1`..`B4`, `F1`..`F5`, `V1`..`V3`, `.specs/features/private-groups-ux-patch/tasks.md`
 - **In-progress** (file:line): none
-- **Next step**: Pronto para commit ou evolução futura de grupos privados com senha
+- **Next step**: Pronto (alterações aprovadas e commitadas na branch `main`)
 - **Blockers**: none
-- **Uncommitted files**: alterações do redesign `festive-ui-ux` e specs no working tree
+- **Uncommitted files**: none
 - **Branch**: main

@@ -121,15 +121,7 @@ class ValueObjectsTest {
     }
 
     @Test
-    void groupSlugAndStatusEnumsShouldValidateAndFormatProperly() {
-        GroupSlug slug = GroupSlug.fromEventNameAndSuffix("Natal da Família Silva!", "A8F2");
-        assertThat(slug.value()).isEqualTo("natal-da-familia-silva-a8f2");
-
-        assertThatThrownBy(() -> new GroupSlug("ab"))
-                .isInstanceOf(DomainValidationException.class);
-        assertThatThrownBy(() -> new GroupSlug("invalid slug!"))
-                .isInstanceOf(DomainValidationException.class);
-
+    void statusEnumsShouldResolveAllValues() {
         assertThat(GroupStatus.valueOf("OPEN")).isEqualTo(GroupStatus.OPEN);
         assertThat(GroupStatus.valueOf("DRAWN")).isEqualTo(GroupStatus.DRAWN);
         assertThat(RevealStatus.valueOf("WAITING_DRAW")).isEqualTo(RevealStatus.WAITING_DRAW);

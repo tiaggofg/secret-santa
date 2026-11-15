@@ -9,6 +9,7 @@ import com.secretsanta.domain.exception.GroupAlreadyDrawnException;
 import com.secretsanta.domain.exception.GroupNotDrawnYetException;
 import com.secretsanta.domain.exception.InsufficientParticipantsForDrawException;
 import com.secretsanta.domain.exception.InvalidCredentialsException;
+import com.secretsanta.domain.exception.InvalidGroupPinException;
 import com.secretsanta.domain.exception.InvalidPasswordResetTokenException;
 import com.secretsanta.domain.exception.ResourceNotFoundException;
 import com.secretsanta.domain.exception.UnauthorizedOrganizerAccessException;
@@ -55,6 +56,17 @@ class GlobalExceptionHandlerTest {
         assertThat(problem.getTitle()).isEqualTo("Unauthorized");
         assertThat(problem.getDetail()).isEqualTo("Invalid username or PIN");
         assertThat(problem.getProperties()).containsEntry("errorCode", "INVALID_CREDENTIALS");
+    }
+
+    @Test
+    void shouldMapInvalidGroupPinExceptionToHttp403Forbidden() {
+        ProblemDetail problem = handler.handleInvalidGroupPin(
+                new InvalidGroupPinException("Invalid group PIN"));
+
+        assertThat(problem.getStatus()).isEqualTo(HttpStatus.FORBIDDEN.value());
+        assertThat(problem.getTitle()).isEqualTo("Forbidden");
+        assertThat(problem.getDetail()).isEqualTo("Invalid group PIN");
+        assertThat(problem.getProperties()).containsEntry("errorCode", "INVALID_GROUP_PIN");
     }
 
     @Test

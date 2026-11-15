@@ -1,6 +1,5 @@
 package com.secretsanta.domain.port;
 
-import com.secretsanta.domain.model.GroupSlug;
 import com.secretsanta.domain.model.SecretSantaGroup;
 import java.util.List;
 import java.util.Optional;
@@ -12,9 +11,5 @@ public interface SecretSantaGroupRepository {
 
     Optional<SecretSantaGroup> findById(UUID id);
 
-    Optional<SecretSantaGroup> findByPublicSlug(GroupSlug publicSlug);
-
-    boolean existsByPublicSlug(GroupSlug publicSlug);
-
-    List<SecretSantaGroup> findAllOrderByCreatedAtDesc();
+    List<SecretSantaGroup> findByUserParticipationOrOrganizationOrderByCreatedAtDesc(UUID userId);
 }

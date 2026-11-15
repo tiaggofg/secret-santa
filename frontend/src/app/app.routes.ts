@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { HomeGroupsPageComponent } from './features/home/home-groups-page.component';
+import { RegisterPageComponent } from './features/auth/register-page.component';
 import { PublicGroupPageComponent } from './features/public-group/public-group-page.component';
 import { AdminDashboardPageComponent } from './features/admin/admin-dashboard-page.component';
 import { ResetPinPageComponent } from './features/public-group/reset-pin-page.component';
@@ -10,11 +11,15 @@ export const routes: Routes = [
     component: HomeGroupsPageComponent
   },
   {
-    path: 'g/:slug',
+    path: 'cadastro',
+    component: RegisterPageComponent
+  },
+  {
+    path: 'g/:groupId',
     component: PublicGroupPageComponent
   },
   {
-    path: 'g/:slug/admin',
+    path: 'g/:groupId/admin',
     component: AdminDashboardPageComponent
   },
   {

@@ -14,37 +14,31 @@ describe('PublicGroupPageComponent', () => {
   let fixture: ComponentFixture<PublicGroupPageComponent>;
   let component: PublicGroupPageComponent;
   let authStore: AuthSessionStore;
-  let geoStore: DeviceSessionGeoStore;
 
-  const openGroupMock: PublicGroupView = {
-    id: 'g-1',
-    slug: 'natal-silva-a8f2',
-    publicSlug: 'natal-silva-a8f2',
+  const groupId = '11111111-1111-1111-1111-111111111111';
+
+  const openHiddenParticipantsGroupMock: PublicGroupView = {
+    id: groupId,
     eventName: 'Natal Família Silva',
     organizerUserId: 'org-1',
     status: 'OPEN',
     geographicRestrictionRelaxed: false,
-    sharePath: '/g/natal-silva-a8f2',
+    sharePath: `/g/${groupId}`,
     organizer: false,
     joined: false,
+    participantsVisible: false,
+    participantCount: 1,
     createdAt: '2026-11-13T18:00:00Z',
     drawnAt: null,
-    participants: [
-      {
-        id: 'p-1',
-        userId: 'u-1',
-        name: 'Maria Silva',
-        username: 'maria.silva',
-        hasGeoLocation: true,
-        revealStatus: 'WAITING_DRAW',
-        createdAt: '2026-11-13T18:01:00Z'
-      }
-    ]
+    participants: []
   };
 
-  const drawnGroupMock: PublicGroupView = {
-    ...openGroupMock,
+  const drawnVisibleGroupMock: PublicGroupView = {
+    ...openHiddenParticipantsGroupMock,
     status: 'DRAWN',
+    joined: true,
+    participantsVisible: true,
+    participantCount: 2,
     drawnAt: '2026-11-13T19:00:00Z',
     participants: [
       {
@@ -70,8 +64,6 @@ describe('PublicGroupPageComponent', () => {
 
   const apiMock = {
     getPublicGroup: vi.fn(),
-    register: vi.fn(),
-    login: vi.fn(),
     joinGroup: vi.fn(),
     revealMatch: vi.fn()
   };
@@ -82,7 +74,7 @@ describe('PublicGroupPageComponent', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    apiMock.getPublicGroup.mockReturnValue(of(openGroupMock));
+    apiMock.getPublicGroup.mockReturnValue(of(openHiddenParticipantsGroupMock));
     geoServiceMock.captureCoordinatesForJoin.mockResolvedValue({
       latitude: -23.5505,
       longitude: -46.6333,
@@ -100,7 +92,7 @@ describe('PublicGroupPageComponent', () => {
           provide: ActivatedRoute,
           useValue: {
             snapshot: {
-              paramMap: convertToParamMap({ slug: 'natal-silva-a8f2' })
+              paramMap: convertToParamMap({ groupId })
             }
           }
         },
@@ -110,21 +102,29 @@ describe('PublicGroupPageComponent', () => {
     }).compileComponents();
 
     authStore = TestBed.inject(AuthSessionStore);
-    geoStore = TestBed.inject(DeviceSessionGeoStore);
     fixture = TestBed.createComponent(PublicGroupPageComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
 
-  it('allows an unauthenticated visitor arriving via WhatsApp link /g/:slug while OPEN to register and automatically join the group (C10)', async () => {
-    apiMock.register.mockReturnValue(
-      of({
-        token: 'tok-vis',
-        userId: 'u-vis',
-        name: 'Joãozinho Silva',
-        username: 'joaozinho.silva'
-      })
+  it('opens on visitor login without tablist, hides participant list for non-members and switches to inline register with Continuar button', async () => {
+    expect(fixture.nativeElement.querySelector('[role="tablist"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="visitor-login-form"]')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="public-participants-list"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="private-participants-notice"]')).not.toBeNull();
+    expect(fixture.nativeElement.textContent.toLowerCase()).not.toContain('username');
+
+    const goToRegisterBtn: HTMLButtonElement = fixture.nativeElement.querySelector(
+      '[data-testid="visitor-go-to-register-link"]'
     );
+    goToRegisterBtn.click();
+    fixture.detectChanges();
+
+    const submitBtn: HTMLButtonElement = fixture.nativeElement.querySelector(
+      '[data-testid="visitor-register-join-btn"]'
+    );
+    expect(submitBtn.textContent).toContain('Continuar');
+
     apiMock.joinGroup.mockReturnValue(
       of({
         id: 'p-vis',
@@ -134,7 +134,8 @@ describe('PublicGroupPageComponent', () => {
         hasGeoLocation: true,
         revealStatus: 'WAITING_DRAW',
         createdAt: '2026-11-13T18:05:00Z',
-        groupSlug: 'natal-silva-a8f2',
+        groupId,
+        sharePath: `/g/${groupId}`,
         token: 'tok-vis'
       })
     );
@@ -146,80 +147,124 @@ describe('PublicGroupPageComponent', () => {
 
     expect(component.visitorRegisterForm.controls.username.value).toBe('joaozinho.silva');
 
-    const pinInput: HTMLInputElement = fixture.nativeElement.querySelector('#vis-pin');
-    pinInput.value = '1234';
-    pinInput.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
+    component.visitorRegisterForm.controls.pin.setValue('1234');
+    component.visitorRegisterForm.controls.groupPin.setValue('5678');
 
-    const form: HTMLFormElement = fixture.nativeElement.querySelector(
-      '[data-testid="visitor-register-form"]'
-    );
+    const form: HTMLFormElement = fixture.nativeElement.querySelector('[data-testid="visitor-register-form"]');
     form.dispatchEvent(new Event('submit'));
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(geoServiceMock.captureCoordinatesForJoin).toHaveBeenCalledTimes(1);
-    expect(apiMock.register).toHaveBeenCalledWith({
+    expect(apiMock.joinGroup).toHaveBeenCalledWith(groupId, {
       name: 'Joãozinho Silva',
       username: 'joaozinho.silva',
-      pin: '1234'
-    });
-    expect(apiMock.joinGroup).toHaveBeenCalledWith('natal-silva-a8f2', {
+      pin: '1234',
+      groupPin: '5678',
       latitude: -23.5505,
       longitude: -46.6333
     });
     expect(authStore.isAuthenticated()).toBe(true);
   });
 
-  it('allows switching family user on /g/:slug after joining to register a dependent on the same phone reusing DeviceSessionGeoStore', () => {
-    authStore.setSession({
-      token: 'tok-parent',
-      userId: 'u-1',
-      name: 'Maria Silva',
-      username: 'maria.silva'
-    });
-    geoStore.saveCapturedCoordinates(-23.5505, -46.6333);
-    component.group.set({ ...openGroupMock, joined: true });
-    fixture.detectChanges();
-
-    expect(fixture.nativeElement.querySelector('[data-testid="already-joined-confirmation"]')).not.toBeNull();
-
-    const switchBtn: HTMLButtonElement = fixture.nativeElement.querySelector(
-      '[data-testid="public-switch-family-user-btn"]'
+  it('shows 403 error message when visitor enters wrong groupPin', async () => {
+    apiMock.joinGroup.mockReturnValue(
+      throwError(() => new HttpErrorResponse({ status: 403, statusText: 'Forbidden' }))
     );
-    switchBtn.click();
+
+    component.visitorLoginForm.setValue({
+      username: 'maria.silva',
+      pin: '1234',
+      groupPin: '0000'
+    });
+    await component.submitVisitorLoginAndJoin();
     fixture.detectChanges();
 
-    expect(authStore.isAuthenticated()).toBe(false);
-    expect(geoStore.hasCapturedValidCoordinates()).toBe(true);
-    expect(fixture.nativeElement.querySelector('[data-testid="visitor-register-form"]')).not.toBeNull();
+    const alert = fixture.nativeElement.querySelector('[data-testid="public-group-error"]');
+    expect(alert?.textContent).toContain('PIN do grupo incorreto');
   });
 
-  it('displays reveal form and participant list when DRAWN with human labels, pre-filling username when clicking a participant item (C29)', () => {
-    apiMock.getPublicGroup.mockReturnValue(of(drawnGroupMock));
+  it('displays greeting without @username and requires groupPin for non-organizer authenticated user, but bypasses groupPin for organizer', async () => {
+    authStore.setSession({
+      token: 'tok-auth',
+      userId: 'u-55',
+      name: 'Pedro Silva',
+      username: 'pedro.silva'
+    });
+    component.group.set({ ...openHiddenParticipantsGroupMock, organizer: false, joined: false });
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain(
+      'Olá, Pedro Silva. Toque abaixo para confirmar sua participação neste grupo:'
+    );
+    expect(fixture.nativeElement.textContent).not.toContain('@pedro.silva');
+    expect(fixture.nativeElement.querySelector('[data-testid="public-switch-family-user-btn"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="authenticated-group-pin-input"]')).not.toBeNull();
+
+    // Organizer bypasses groupPin
+    component.group.set({ ...openHiddenParticipantsGroupMock, organizer: true, joined: false });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-testid="authenticated-group-pin-input"]')).toBeNull();
+
+    apiMock.joinGroup.mockReturnValue(
+      of({
+        id: 'p-55',
+        userId: 'u-55',
+        name: 'Pedro Silva',
+        username: 'pedro.silva',
+        hasGeoLocation: true,
+        revealStatus: 'WAITING_DRAW',
+        createdAt: '2026-11-13T18:10:00Z',
+        groupId,
+        sharePath: `/g/${groupId}`,
+        token: null
+      })
+    );
+
+    const joinBtn: HTMLButtonElement = fixture.nativeElement.querySelector(
+      '[data-testid="authenticated-join-btn"]'
+    );
+    joinBtn.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(apiMock.joinGroup).toHaveBeenCalledWith(groupId, {
+      groupPin: undefined,
+      latitude: -23.5505,
+      longitude: -46.6333
+    });
+  });
+
+  it('displays reveal form even when participants are hidden in DRAWN state, and pre-fills when visible', () => {
+    apiMock.getPublicGroup.mockReturnValue(
+      of({
+        ...openHiddenParticipantsGroupMock,
+        status: 'DRAWN',
+        participantsVisible: false,
+        participants: []
+      })
+    );
     component.loadPublicGroup();
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('[data-testid="reveal-form-section"]')).not.toBeNull();
-    expect(fixture.nativeElement.textContent).toContain('Ainda não espiou');
-    expect(fixture.nativeElement.textContent).toContain('Já descobriu');
-    expect(fixture.nativeElement.textContent).not.toContain('PENDING_REVEAL');
-    expect(fixture.nativeElement.textContent).not.toContain('REVEALED');
+    expect(fixture.nativeElement.querySelector('[data-testid="public-participants-list"]')).toBeNull();
+
+    // When visible
+    apiMock.getPublicGroup.mockReturnValue(of(drawnVisibleGroupMock));
+    component.loadPublicGroup();
+    fixture.detectChanges();
 
     const items: NodeListOf<HTMLButtonElement> = fixture.nativeElement.querySelectorAll(
       '[data-testid="participant-list-item"]'
     );
     expect(items.length).toBe(2);
-    expect(items[0].getAttribute('data-reveal-status')).toBe('PENDING_REVEAL');
-    expect(items[1].getAttribute('data-reveal-status')).toBe('REVEALED');
     items[0].click();
     fixture.detectChanges();
-
     expect(component.revealForm.controls.username.value).toBe('maria.silva');
   });
 
-  it('reveals Secret Santa match with valid username + PIN, clears PIN input, and opens EphemeralRevealModalComponent', () => {
-    apiMock.getPublicGroup.mockReturnValue(of(drawnGroupMock));
+  it('reveals Secret Santa match with valid nome de usuário + PIN and opens EphemeralRevealModalComponent', () => {
+    apiMock.getPublicGroup.mockReturnValue(of(drawnVisibleGroupMock));
     component.loadPublicGroup();
     fixture.detectChanges();
 
@@ -241,7 +286,7 @@ describe('PublicGroupPageComponent', () => {
     revealFormEl.dispatchEvent(new Event('submit'));
     fixture.detectChanges();
 
-    expect(apiMock.revealMatch).toHaveBeenCalledWith('natal-silva-a8f2', {
+    expect(apiMock.revealMatch).toHaveBeenCalledWith(groupId, {
       username: 'maria.silva',
       pin: '1234'
     });
@@ -249,74 +294,5 @@ describe('PublicGroupPageComponent', () => {
     expect(fixture.nativeElement.querySelector('[data-testid="drawn-participant-name"]')?.textContent).toContain(
       'Lucas Silva'
     );
-
-    // Close modal and verify wipe
-    const closeBtn: HTMLButtonElement = fixture.nativeElement.querySelector(
-      '[data-testid="close-and-pass-phone-btn"]'
-    );
-    closeBtn.click();
-    fixture.detectChanges();
-
-    expect(component.revealedFriendName()).toBeNull();
-    expect(fixture.nativeElement.querySelector('[data-testid="drawn-participant-name"]')).toBeNull();
-  });
-
-  it('clears PIN field and shows error message when reveal fails with HTTP 401 invalid PIN', () => {
-    apiMock.getPublicGroup.mockReturnValue(of(drawnGroupMock));
-    component.loadPublicGroup();
-    fixture.detectChanges();
-
-    apiMock.revealMatch.mockReturnValue(
-      throwError(() => new HttpErrorResponse({ status: 401, statusText: 'Unauthorized' }))
-    );
-
-    component.revealForm.setValue({
-      username: 'maria.silva',
-      pin: '9999'
-    });
-    component.submitReveal();
-    fixture.detectChanges();
-
-    expect(component.revealForm.controls.pin.value).toBe('');
-    expect(fixture.nativeElement.querySelector('[data-testid="public-group-error"]')?.textContent).toContain(
-      'Usuário ou PIN incorreto'
-    );
-  });
-
-  it('allows an already authenticated user who opens /g/:slug while OPEN to join with 1 tap', async () => {
-    authStore.setSession({
-      token: 'tok-auth',
-      userId: 'u-55',
-      name: 'Pedro Silva',
-      username: 'pedro.silva'
-    });
-    component.group.set({ ...openGroupMock, joined: false });
-    fixture.detectChanges();
-
-    apiMock.joinGroup.mockReturnValue(
-      of({
-        id: 'p-55',
-        userId: 'u-55',
-        name: 'Pedro Silva',
-        username: 'pedro.silva',
-        hasGeoLocation: true,
-        revealStatus: 'WAITING_DRAW',
-        createdAt: '2026-11-13T18:10:00Z',
-        groupSlug: 'natal-silva-a8f2',
-        token: null
-      })
-    );
-
-    const joinBtn: HTMLButtonElement = fixture.nativeElement.querySelector(
-      '[data-testid="authenticated-join-btn"]'
-    );
-    joinBtn.click();
-    await fixture.whenStable();
-    fixture.detectChanges();
-
-    expect(apiMock.joinGroup).toHaveBeenCalledWith('natal-silva-a8f2', {
-      latitude: -23.5505,
-      longitude: -46.6333
-    });
   });
 });

@@ -1,20 +1,23 @@
 package com.secretsanta.infrastructure.persistence;
 
 import com.secretsanta.domain.model.GeoCoordinates;
-import com.secretsanta.domain.model.GroupSlug;
 import com.secretsanta.domain.model.GroupStatus;
 import com.secretsanta.domain.model.Participant;
 import com.secretsanta.domain.model.ParticipantName;
+import com.secretsanta.domain.model.PinHash;
 import com.secretsanta.domain.model.SecretSantaGroup;
 import com.secretsanta.domain.model.Username;
 import com.secretsanta.domain.port.SecretSantaGroupRepository;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 
 @Repository
 public class MongoSecretSantaGroupAdapter implements SecretSantaGroupRepository {
+
+    private static final Sort CREATED_AT_DESC = Sort.by(Sort.Direction.DESC, "createdAt");
 
     private final SpringDataSecretSantaGroupMongoRepository repository;
 
@@ -35,18 +38,8 @@ public class MongoSecretSantaGroupAdapter implements SecretSantaGroupRepository 
     }
 
     @Override
-    public Optional<SecretSantaGroup> findByPublicSlug(GroupSlug publicSlug) {
-        return repository.findByPublicSlug(publicSlug.value()).map(MongoSecretSantaGroupAdapter::toDomain);
-    }
-
-    @Override
-    public boolean existsByPublicSlug(GroupSlug publicSlug) {
-        return repository.existsByPublicSlug(publicSlug.value());
-    }
-
-    @Override
-    public List<SecretSantaGroup> findAllOrderByCreatedAtDesc() {
-        return repository.findAllByOrderByCreatedAtDesc()
+    public List<SecretSantaGroup> findByUserParticipationOrOrganizationOrderByCreatedAtDesc(UUID userId) {
+        return repository.findByOrganizerOrParticipantOrderByCreatedAtDesc(userId.toString(), CREATED_AT_DESC)
                 .stream()
                 .map(MongoSecretSantaGroupAdapter::toDomain)
                 .toList();
@@ -60,8 +53,8 @@ public class MongoSecretSantaGroupAdapter implements SecretSantaGroupRepository 
 
         return new SecretSantaGroupDocument(
                 group.id().toString(),
-                group.publicSlug().value(),
                 group.eventName(),
+                group.groupPinHash().value(),
                 group.organizerUserId().toString(),
                 group.status().name(),
                 group.geographicRestrictionRelaxed(),
@@ -78,8 +71,8 @@ public class MongoSecretSantaGroupAdapter implements SecretSantaGroupRepository 
 
         return SecretSantaGroup.reconstitute(
                 UUID.fromString(doc.getId()),
-                new GroupSlug(doc.getPublicSlug()),
                 doc.getEventName(),
+                new PinHash(doc.getGroupPinHash()),
                 UUID.fromString(doc.getOrganizerUserId()),
                 GroupStatus.valueOf(doc.getStatus()),
                 doc.isGeographicRestrictionRelaxed(),

@@ -8,6 +8,7 @@ import com.secretsanta.application.SecretSantaApplicationService.RevealMatchView
 import com.secretsanta.application.StatelessSessionTokenService;
 import com.secretsanta.application.StatelessSessionTokenService.AuthenticatedUser;
 import com.secretsanta.domain.exception.InvalidCredentialsException;
+import com.secretsanta.domain.exception.ResourceNotFoundException;
 import java.util.UUID;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -42,40 +43,44 @@ public class GroupPublicController {
         return applicationService.listGroupsForUser(user.userId());
     }
 
-    @GetMapping("/{slug}")
+    @GetMapping("/{groupId}")
     @ResponseStatus(HttpStatus.OK)
     public PublicGroupView getPublicGroup(
-            @PathVariable("slug") String slug,
+            @PathVariable("groupId") String groupIdRaw,
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader) {
+        UUID groupId = parseGroupId(groupIdRaw);
         UUID currentUserId = null;
         if (authorizationHeader != null && !authorizationHeader.isBlank()) {
             currentUserId = tokenService.parseAndValidate(authorizationHeader).userId();
         }
-        return applicationService.getPublicGroup(slug, currentUserId);
+        return applicationService.getPublicGroup(groupId, currentUserId);
     }
 
-    @PostMapping("/{slug}/participants")
+    @PostMapping("/{groupId}/participants")
     @ResponseStatus(HttpStatus.CREATED)
     public ParticipantRegistrationView joinGroup(
-            @PathVariable("slug") String slug,
+            @PathVariable("groupId") String groupIdRaw,
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader,
             @RequestBody(required = false) JoinGroupRequest request) {
+        UUID groupId = parseGroupId(groupIdRaw);
         Double latitude = request != null ? request.latitude() : null;
         Double longitude = request != null ? request.longitude() : null;
+        String groupPin = request != null ? request.groupPin() : null;
 
         if (authorizationHeader != null && !authorizationHeader.isBlank()) {
             AuthenticatedUser user = tokenService.parseAndValidate(authorizationHeader);
-            return applicationService.registerParticipant(slug, user.userId(), latitude, longitude);
+            return applicationService.registerParticipant(groupId, user.userId(), groupPin, latitude, longitude);
         }
 
         if (request != null
                 && ((request.name() != null && !request.name().isBlank())
                         || (request.username() != null && !request.username().isBlank()))) {
             return applicationService.registerVisitorAndJoinGroup(
-                    slug,
+                    groupId,
                     request.name(),
                     request.username(),
                     request.pin(),
+                    groupPin,
                     latitude,
                     longitude);
         }
@@ -83,21 +88,31 @@ public class GroupPublicController {
         throw new InvalidCredentialsException("Authentication token or user registration details are required to join");
     }
 
-    @PostMapping("/{slug}/participants/reveal")
+    @PostMapping("/{groupId}/participants/reveal")
     @ResponseStatus(HttpStatus.OK)
     public RevealMatchView revealMatch(
-            @PathVariable("slug") String slug,
+            @PathVariable("groupId") String groupIdRaw,
             @RequestBody(required = false) RevealMatchRequest request) {
+        UUID groupId = parseGroupId(groupIdRaw);
         if (request == null) {
-            return applicationService.revealMatch(slug, null, null);
+            return applicationService.revealMatch(groupId, null, null);
         }
-        return applicationService.revealMatch(slug, request.username(), request.pin());
+        return applicationService.revealMatch(groupId, request.username(), request.pin());
+    }
+
+    static UUID parseGroupId(String groupIdRaw) {
+        try {
+            return UUID.fromString(groupIdRaw);
+        } catch (IllegalArgumentException | NullPointerException ex) {
+            throw new ResourceNotFoundException("Group not found: " + groupIdRaw);
+        }
     }
 
     public record JoinGroupRequest(
             String name,
             String username,
             String pin,
+            String groupPin,
             Double latitude,
             Double longitude) {
     }

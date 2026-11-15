@@ -1,7 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { HttpErrorResponse } from '@angular/common/http';
-import { of, throwError } from 'rxjs';
+import { of } from 'rxjs';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { HomeGroupsPageComponent } from './home-groups-page.component';
 import { SecretSantaApiService } from '../../core/api/secret-santa-api.service';
@@ -15,7 +14,6 @@ describe('HomeGroupsPageComponent', () => {
   let geoStore: DeviceSessionGeoStore;
 
   const apiMock = {
-    register: vi.fn(),
     login: vi.fn(),
     listGroups: vi.fn(),
     createGroup: vi.fn()
@@ -28,33 +26,15 @@ describe('HomeGroupsPageComponent', () => {
       of({
         myGroups: [
           {
-            id: 'g-my-1',
-            slug: 'familia-godoy-1',
-            publicSlug: 'familia-godoy-1',
+            id: '11111111-1111-1111-1111-111111111111',
             eventName: 'Natal Família Godoy',
             organizerUserId: 'u-1',
             status: 'OPEN',
             participantCount: 4,
             organizer: true,
             joined: true,
-            sharePath: '/g/familia-godoy-1',
+            sharePath: '/g/11111111-1111-1111-1111-111111111111',
             createdAt: '2026-11-13T18:00:00Z',
-            drawnAt: null
-          }
-        ],
-        availableGroups: [
-          {
-            id: 'g-av-1',
-            slug: 'primos-2026',
-            publicSlug: 'primos-2026',
-            eventName: 'Amigo Secreto dos Primos',
-            organizerUserId: 'u-99',
-            status: 'OPEN',
-            participantCount: 2,
-            organizer: false,
-            joined: false,
-            sharePath: '/g/primos-2026',
-            createdAt: '2026-11-13T18:10:00Z',
             drawnAt: null
           }
         ]
@@ -78,63 +58,24 @@ describe('HomeGroupsPageComponent', () => {
     fixture.detectChanges();
   });
 
-  it('auto-suggests username from name during basic registration and displays only My Groups on submit', () => {
-    apiMock.register.mockReturnValue(
-      of({
-        token: 'tok-reg',
-        userId: 'u-1',
-        name: 'Maria Clara',
-        username: 'maria.clara'
-      })
+  it('renders direct login form without tablist, simplified hero and link to /cadastro', () => {
+    expect(fixture.nativeElement.querySelector('[role="tablist"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="login-form"]')).not.toBeNull();
+    expect(fixture.nativeElement.textContent).toContain(
+      'Entre para criar seu Amigo Secreto ou participar dos sorteios com a família e amigos!'
     );
+    expect(fixture.nativeElement.textContent).not.toContain('Sem e-mail');
+    expect(fixture.nativeElement.textContent.toLowerCase()).not.toContain('username');
 
-    const nameInput: HTMLInputElement = fixture.nativeElement.querySelector('#reg-name');
-    nameInput.value = 'Maria Clara';
-    nameInput.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
-
-    expect(component.registerForm.controls.username.value).toBe('maria.clara');
-
-    const pinInput: HTMLInputElement = fixture.nativeElement.querySelector('#reg-pin');
-    pinInput.value = '1234';
-    pinInput.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
-
-    const form: HTMLFormElement = fixture.nativeElement.querySelector('[data-testid="register-form"]');
-    form.dispatchEvent(new Event('submit'));
-    fixture.detectChanges();
-
-    expect(apiMock.register).toHaveBeenCalledWith({
-      name: 'Maria Clara',
-      username: 'maria.clara',
-      pin: '1234'
-    });
-    expect(authStore.isAuthenticated()).toBe(true);
-    expect(apiMock.listGroups).toHaveBeenCalled();
-    expect(fixture.nativeElement.textContent).toContain('Meus Grupos');
-    expect(fixture.nativeElement.textContent).toContain('Natal Família Godoy');
-    expect(fixture.nativeElement.querySelector('[data-testid="available-groups-section"]')).toBeNull();
-    expect(fixture.nativeElement.textContent).not.toContain('Amigo Secreto dos Primos');
+    const registerLink: HTMLAnchorElement = fixture.nativeElement.querySelector(
+      '[data-testid="go-to-register-link"]'
+    );
+    expect(registerLink).not.toBeNull();
+    expect(registerLink.textContent).toContain('Não tem uma conta? Clique aqui');
+    expect(registerLink.getAttribute('href')).toBe('/cadastro');
   });
 
-  it('shows helpful suggestion when registration fails with HTTP 409 duplicate username', () => {
-    apiMock.register.mockReturnValue(
-      throwError(() => new HttpErrorResponse({ status: 409, statusText: 'Conflict' }))
-    );
-
-    component.registerForm.setValue({
-      name: 'Maria Silva',
-      username: 'maria.silva',
-      pin: '1234'
-    });
-    component.submitRegister();
-    fixture.detectChanges();
-
-    const alert = fixture.nativeElement.querySelector('[data-testid="auth-error"]');
-    expect(alert?.textContent).toContain('já está em uso');
-  });
-
-  it('logs in existing user with username + PIN and displays only My Groups', () => {
+  it('logs in existing user with nome de usuário + PIN and displays only My Groups', () => {
     apiMock.login.mockReturnValue(
       of({
         token: 'tok-login',
@@ -143,10 +84,6 @@ describe('HomeGroupsPageComponent', () => {
         username: 'tiago.godoy'
       })
     );
-
-    const loginTab: HTMLButtonElement = fixture.nativeElement.querySelector('[data-testid="tab-login"]');
-    loginTab.click();
-    fixture.detectChanges();
 
     component.loginForm.setValue({
       username: 'tiago.godoy',
@@ -162,10 +99,12 @@ describe('HomeGroupsPageComponent', () => {
     });
     expect(authStore.isAuthenticated()).toBe(true);
     expect(component.myGroups().length).toBe(1);
-    expect(fixture.nativeElement.querySelector('[data-testid="available-groups-section"]')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Meus Grupos');
+    expect(fixture.nativeElement.textContent).toContain('Natal Família Godoy');
+    expect(fixture.nativeElement.textContent).toContain('+ Novo Amigo Secreto');
   });
 
-  it('opens create group modal from button, submits eventName and closes modal on success', () => {
+  it('opens Novo Amigo Secreto modal without suggestions, requires groupPin and creates group on submit', () => {
     authStore.setSession({
       token: 'tok-1',
       userId: 'u-1',
@@ -179,38 +118,41 @@ describe('HomeGroupsPageComponent', () => {
     const openModalBtn: HTMLButtonElement = fixture.nativeElement.querySelector(
       '[data-testid="open-create-group-modal-btn"]'
     );
+    expect(openModalBtn.textContent).toContain('+ Novo Amigo Secreto');
     openModalBtn.click();
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('[data-testid="create-group-modal"]')).not.toBeNull();
+    const modal: HTMLElement = fixture.nativeElement.querySelector('[data-testid="create-group-modal"]');
+    expect(modal).not.toBeNull();
+    expect(modal.textContent).toContain('Novo Amigo Secreto');
+    expect(modal.textContent).toContain('Criar Amigo Secreto');
+    expect(modal.textContent).not.toContain('Ceia de Natal em Casa');
 
     apiMock.createGroup.mockReturnValue(
       of({
-        id: 'g-new',
-        slug: 'natal-2026-a1b2',
-        publicSlug: 'natal-2026-a1b2',
+        id: '22222222-2222-2222-2222-222222222222',
         eventName: 'Natal 2026',
         organizerUserId: 'u-1',
         status: 'OPEN',
         geographicRestrictionRelaxed: false,
-        sharePath: '/g/natal-2026-a1b2',
+        sharePath: '/g/22222222-2222-2222-2222-222222222222',
         createdAt: '2026-11-13T18:20:00Z',
         drawnAt: null,
         participants: []
       })
     );
 
-    component.createGroupForm.setValue({ eventName: 'Natal 2026' });
+    component.createGroupForm.setValue({ eventName: 'Natal 2026', groupPin: '5678' });
     const createForm: HTMLFormElement = fixture.nativeElement.querySelector('[data-testid="create-group-form"]');
     createForm.dispatchEvent(new Event('submit'));
     fixture.detectChanges();
 
-    expect(apiMock.createGroup).toHaveBeenCalledWith({ eventName: 'Natal 2026' });
+    expect(apiMock.createGroup).toHaveBeenCalledWith({ eventName: 'Natal 2026', groupPin: '5678' });
     expect(fixture.nativeElement.querySelector('[data-testid="create-group-modal"]')).toBeNull();
     expect(fixture.nativeElement.textContent).toContain('Grupo "Natal 2026" criado com sucesso!');
   });
 
-  it('clears AuthSessionStore in memory while preserving DeviceSessionGeoStore when clicking discreet switch user button (C12)', () => {
+  it('clears AuthSessionStore in memory while preserving DeviceSessionGeoStore when clicking switch user button', () => {
     authStore.setSession({
       token: 'tok-parent',
       userId: 'u-parent',
@@ -230,10 +172,6 @@ describe('HomeGroupsPageComponent', () => {
     expect(authStore.isAuthenticated()).toBe(false);
     expect(authStore.session()).toBeNull();
     expect(geoStore.hasCapturedValidCoordinates()).toBe(true);
-    expect(geoStore.coordinates()).toEqual({
-      latitude: -23.5505,
-      longitude: -46.6333
-    });
-    expect(fixture.nativeElement.querySelector('[data-testid="register-form"]')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="login-form"]')).not.toBeNull();
   });
 });

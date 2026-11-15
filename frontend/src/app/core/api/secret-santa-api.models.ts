@@ -26,8 +26,6 @@ export interface AuthSessionView {
 
 export interface GroupSummaryView {
   id: string;
-  slug: string;
-  publicSlug: string;
   eventName: string;
   organizerUserId: string;
   status: GroupStatus;
@@ -41,11 +39,15 @@ export interface GroupSummaryView {
 
 export interface GroupDiscoveryView {
   myGroups: GroupSummaryView[];
-  availableGroups: GroupSummaryView[];
 }
 
 export interface CreateGroupRequest {
   eventName: string;
+  groupPin: string;
+}
+
+export interface UpdateGroupPinRequest {
+  groupPin: string;
 }
 
 export interface AdminParticipantView {
@@ -60,8 +62,6 @@ export interface AdminParticipantView {
 
 export interface AdminGroupView {
   id: string;
-  slug: string;
-  publicSlug: string;
   eventName: string;
   organizerUserId: string;
   status: GroupStatus;
@@ -84,8 +84,6 @@ export interface PublicParticipantView {
 
 export interface PublicGroupView {
   id: string;
-  slug: string;
-  publicSlug: string;
   eventName: string;
   organizerUserId: string;
   status: GroupStatus;
@@ -93,6 +91,8 @@ export interface PublicGroupView {
   sharePath: string;
   organizer: boolean;
   joined: boolean;
+  participantsVisible: boolean;
+  participantCount: number;
   createdAt: string;
   drawnAt: string | null;
   participants: PublicParticipantView[];
@@ -102,6 +102,7 @@ export interface JoinGroupRequest {
   name?: string;
   username?: string;
   pin?: string;
+  groupPin?: string;
   latitude: number | null;
   longitude: number | null;
 }
@@ -114,7 +115,8 @@ export interface ParticipantRegistrationView {
   hasGeoLocation: boolean;
   revealStatus: RevealStatus;
   createdAt: string;
-  groupSlug: string;
+  groupId: string;
+  sharePath: string;
   token: string | null;
 }
 

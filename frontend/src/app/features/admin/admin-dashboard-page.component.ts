@@ -1,4 +1,5 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { SecretSantaApiService } from '../../core/api/secret-santa-api.service';
@@ -14,7 +15,7 @@ import { formatParticipantCount, getAvatarTone, getInitials } from '../../shared
 @Component({
   selector: 'app-admin-dashboard-page',
   standalone: true,
-  imports: [RouterLink, FestiveIconComponent],
+  imports: [ReactiveFormsModule, RouterLink, FestiveIconComponent],
   template: `
     <div class="space-y-6">
       <div class="flex flex-wrap items-center justify-between gap-2">
@@ -26,7 +27,7 @@ import { formatParticipantCount, getAvatarTone, getInitials } from '../../shared
         </a>
         @if (group(); as g) {
           <a
-            [routerLink]="['/g', g.slug]"
+            [routerLink]="['/g', g.id]"
             data-testid="view-public-group-link"
             class="min-h-11 text-sm font-semibold text-ink-900 hover:underline inline-flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 rounded-lg px-1"
           >
@@ -115,12 +116,12 @@ import { formatParticipantCount, getAvatarTone, getInitials } from '../../shared
               class="w-full min-h-12 rounded-xl bg-pine-800 hover:bg-pine-900 text-white font-bold text-sm px-4 py-3 shadow-sm transition flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
             >
               <app-festive-icon name="share" svgClass="w-4 h-4" />
-              <span>Convidar Família no WhatsApp</span>
+              <span>Convidar pelo WhatsApp</span>
             </button>
 
             <div class="flex items-center justify-between gap-2 rounded-xl bg-festive-cream border border-festive-border px-3 py-2">
               <span class="text-xs font-mono text-ink-600 break-all">
-                {{ g.sharePath || '/g/' + g.slug }}
+                {{ g.sharePath || '/g/' + g.id }}
               </span>
               <button
                 type="button"
@@ -131,6 +132,60 @@ import { formatParticipantCount, getAvatarTone, getInitials } from '../../shared
                 <span>Copiar</span>
               </button>
             </div>
+          </div>
+
+          <!-- Update Group PIN -->
+          <div class="pt-3 border-t border-festive-border space-y-2.5">
+            <h2 class="text-sm font-bold text-ink-900 flex items-center gap-1.5">
+              <app-festive-icon name="key" svgClass="w-4 h-4 text-gold-600" />
+              <span>Alterar PIN do Grupo</span>
+            </h2>
+
+            @if (pinUpdateFeedback()) {
+              <div
+                role="status"
+                data-testid="update-group-pin-feedback"
+                class="rounded-xl bg-pine-50 border border-pine-200 p-2.5 text-xs text-pine-900 font-medium"
+              >
+                {{ pinUpdateFeedback() }}
+              </div>
+            }
+
+            <form
+              [formGroup]="updateGroupPinForm"
+              (ngSubmit)="onUpdateGroupPin()"
+              class="flex flex-col sm:flex-row gap-2"
+            >
+              <div class="relative flex-1 flex items-center">
+                <input
+                  type="password"
+                  [type]="showGroupPin() ? 'text' : 'password'"
+                  inputmode="numeric"
+                  maxlength="6"
+                  formControlName="groupPin"
+                  data-testid="update-group-pin-input"
+                  placeholder="Novo PIN (4 a 6 dígitos)"
+                  aria-label="Novo PIN do grupo"
+                  class="w-full min-h-11 rounded-xl border border-stone-300 bg-white pl-3.5 pr-11 py-2 text-sm tracking-widest tabular-nums text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  (click)="showGroupPin.set(!showGroupPin())"
+                  aria-label="Mostrar ou ocultar novo PIN do grupo"
+                  class="absolute right-1 min-w-10 min-h-10 rounded-lg flex items-center justify-center text-ink-600 hover:text-pine-900 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                >
+                  <app-festive-icon [name]="showGroupPin() ? 'eye-off' : 'eye'" svgClass="w-4 h-4" />
+                </button>
+              </div>
+              <button
+                type="submit"
+                data-testid="update-group-pin-btn"
+                [disabled]="isBusy()"
+                class="min-h-11 px-4 rounded-xl bg-festive-cream hover:bg-stone-200/70 border border-festive-border text-ink-900 font-semibold text-xs shrink-0 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+              >
+                Salvar Novo PIN do Grupo
+              </button>
+            </form>
           </div>
 
           @if (g.status === 'OPEN') {
@@ -313,13 +368,20 @@ export class AdminDashboardPageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly apiService = inject(SecretSantaApiService);
   private readonly shareService = inject(ShareLinkService);
+  private readonly fb = inject(NonNullableFormBuilder);
 
   readonly group = signal<AdminGroupView | null>(null);
   readonly isBusy = signal<boolean>(false);
   readonly confirmDrawPending = signal<boolean>(false);
+  readonly showGroupPin = signal<boolean>(false);
   readonly errorMessage = signal<string | null>(null);
   readonly shareFeedback = signal<string | null>(null);
+  readonly pinUpdateFeedback = signal<string | null>(null);
   readonly activeResetLink = signal<PasswordResetLinkView | null>(null);
+
+  readonly updateGroupPinForm = this.fb.group({
+    groupPin: ['', [Validators.required, Validators.pattern(/^\d{4,6}$/)]]
+  });
 
   readonly canExecuteDraw = computed(() => {
     const current = this.group();
@@ -336,11 +398,11 @@ export class AdminDashboardPageComponent implements OnInit {
     return current ? current.participants.filter((p) => p.revealStatus === 'REVEALED').length : 0;
   });
 
-  private slug = '';
+  private groupId = '';
 
   ngOnInit(): void {
-    this.slug = this.route.snapshot.paramMap.get('slug') ?? '';
-    if (this.slug) {
+    this.groupId = this.route.snapshot.paramMap.get('groupId') ?? '';
+    if (this.groupId) {
       this.loadAdminGroup();
     }
   }
@@ -359,7 +421,7 @@ export class AdminDashboardPageComponent implements OnInit {
 
   loadAdminGroup(): void {
     this.errorMessage.set(null);
-    this.apiService.getAdminGroup(this.slug).subscribe({
+    this.apiService.getAdminGroup(this.groupId).subscribe({
       next: (adminGroup) => {
         this.group.set(adminGroup);
       },
@@ -379,8 +441,8 @@ export class AdminDashboardPageComponent implements OnInit {
     this.shareFeedback.set(null);
     const result = await this.shareService.shareLink({
       title: `Amigo Secreto: ${g.eventName}`,
-      text: `Participe do grupo "${g.eventName}" no Amigo Secreto!`,
-      pathOrUrl: g.sharePath || `/g/${g.slug}`
+      text: `Participe do grupo "${g.eventName}" no Amigo Secreto! Peça o PIN de entrada ao organizador.`,
+      pathOrUrl: g.sharePath || `/g/${g.id}`
     });
     this.shareFeedback.set(
       result.method === 'web-share'
@@ -393,13 +455,38 @@ export class AdminDashboardPageComponent implements OnInit {
     await this.shareGroupInviteLink(g);
   }
 
+  onUpdateGroupPin(): void {
+    this.errorMessage.set(null);
+    this.pinUpdateFeedback.set(null);
+    const groupPin = this.updateGroupPinForm.controls.groupPin.value.trim();
+
+    if (!/^\d{4,6}$/.test(groupPin)) {
+      this.errorMessage.set('Informe um novo PIN numérico de 4 a 6 dígitos para o grupo.');
+      return;
+    }
+
+    this.isBusy.set(true);
+    this.apiService.updateGroupPin(this.groupId, { groupPin }).subscribe({
+      next: () => {
+        this.isBusy.set(false);
+        this.showGroupPin.set(false);
+        this.updateGroupPinForm.reset();
+        this.pinUpdateFeedback.set('PIN do grupo atualizado com sucesso!');
+      },
+      error: () => {
+        this.isBusy.set(false);
+        this.errorMessage.set('Não foi possível atualizar o PIN do grupo.');
+      }
+    });
+  }
+
   onRemoveParticipant(participant: AdminParticipantView): void {
-    if (!this.slug) {
+    if (!this.groupId) {
       return;
     }
     this.errorMessage.set(null);
     this.isBusy.set(true);
-    this.apiService.removeParticipant(this.slug, participant.id).subscribe({
+    this.apiService.removeParticipant(this.groupId, participant.id).subscribe({
       next: () => {
         this.isBusy.set(false);
         this.confirmDrawPending.set(false);
@@ -413,12 +500,12 @@ export class AdminDashboardPageComponent implements OnInit {
   }
 
   onExecuteDraw(): void {
-    if (!this.slug) {
+    if (!this.groupId) {
       return;
     }
     this.errorMessage.set(null);
     this.isBusy.set(true);
-    this.apiService.executeDraw(this.slug).subscribe({
+    this.apiService.executeDraw(this.groupId).subscribe({
       next: (updatedGroup) => {
         this.isBusy.set(false);
         this.confirmDrawPending.set(false);
@@ -438,12 +525,12 @@ export class AdminDashboardPageComponent implements OnInit {
   }
 
   onGenerateResetToken(participant: AdminParticipantView): void {
-    if (!this.slug) {
+    if (!this.groupId) {
       return;
     }
     this.errorMessage.set(null);
     this.isBusy.set(true);
-    this.apiService.generatePasswordResetToken(this.slug, participant.id).subscribe({
+    this.apiService.generatePasswordResetToken(this.groupId, participant.id).subscribe({
       next: (resetView) => {
         this.isBusy.set(false);
         this.activeResetLink.set(resetView);

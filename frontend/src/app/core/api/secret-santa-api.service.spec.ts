@@ -117,29 +117,28 @@ describe('SecretSantaApiService & AuthSessionStore', () => {
     const listReq = httpMock.expectOne('/api/v1/groups');
     expect(listReq.request.method).toBe('GET');
     expect(listReq.request.headers.get('Authorization')).toBe('Bearer secret-bearer-token');
-    listReq.flush({ myGroups: [], availableGroups: [] });
+    listReq.flush({ myGroups: [] });
 
-    service.createGroup({ eventName: 'Natal da Família' }).subscribe();
+    service.createGroup({ eventName: 'Natal da Família', groupPin: '4321' }).subscribe();
     const createReq = httpMock.expectOne('/api/v1/groups');
     expect(createReq.request.method).toBe('POST');
     expect(createReq.request.headers.get('Authorization')).toBe('Bearer secret-bearer-token');
-    expect(createReq.request.body).toEqual({ eventName: 'Natal da Família' });
+    expect(createReq.request.body).toEqual({ eventName: 'Natal da Família', groupPin: '4321' });
     createReq.flush({
-      id: 'g-1',
-      slug: 'natal-da-familia-a1b2',
-      publicSlug: 'natal-da-familia-a1b2',
+      id: '11111111-1111-1111-1111-111111111111',
       eventName: 'Natal da Família',
       organizerUserId: 'u-1',
       status: 'OPEN',
       geographicRestrictionRelaxed: false,
-      sharePath: '/g/natal-da-familia-a1b2',
+      sharePath: '/g/11111111-1111-1111-1111-111111111111',
       createdAt: '2026-11-13T18:00:00Z',
       drawnAt: null,
       participants: []
     });
   });
 
-  it('calls joinGroup and revealMatch endpoints for a group slug', () => {
+  it('calls joinGroup and revealMatch endpoints for a group UUID', () => {
+    const groupId = '11111111-1111-1111-1111-111111111111';
     authStore.setSession({
       token: 'token-join',
       userId: 'u-2',
@@ -148,13 +147,13 @@ describe('SecretSantaApiService & AuthSessionStore', () => {
     });
 
     service
-      .joinGroup('natal-familia-123', { latitude: -23.55, longitude: -46.63 })
+      .joinGroup(groupId, { groupPin: '1234', latitude: -23.55, longitude: -46.63 })
       .subscribe();
 
-    const joinReq = httpMock.expectOne('/api/v1/groups/natal-familia-123/participants');
+    const joinReq = httpMock.expectOne(`/api/v1/groups/${groupId}/participants`);
     expect(joinReq.request.method).toBe('POST');
     expect(joinReq.request.headers.get('Authorization')).toBe('Bearer token-join');
-    expect(joinReq.request.body).toEqual({ latitude: -23.55, longitude: -46.63 });
+    expect(joinReq.request.body).toEqual({ groupPin: '1234', latitude: -23.55, longitude: -46.63 });
     joinReq.flush({
       id: 'p-1',
       userId: 'u-2',
@@ -163,16 +162,17 @@ describe('SecretSantaApiService & AuthSessionStore', () => {
       hasGeoLocation: true,
       revealStatus: 'WAITING_DRAW',
       createdAt: '2026-11-13T18:05:00Z',
-      groupSlug: 'natal-familia-123',
+      groupId,
+      sharePath: `/g/${groupId}`,
       token: null
     });
 
     let revealResponse: unknown;
     service
-      .revealMatch('natal-familia-123', { username: 'joao.silva', pin: '1234' })
+      .revealMatch(groupId, { username: 'joao.silva', pin: '1234' })
       .subscribe((res) => (revealResponse = res));
 
-    const revealReq = httpMock.expectOne('/api/v1/groups/natal-familia-123/participants/reveal');
+    const revealReq = httpMock.expectOne(`/api/v1/groups/${groupId}/participants/reveal`);
     expect(revealReq.request.method).toBe('POST');
     expect(revealReq.request.body).toEqual({ username: 'joao.silva', pin: '1234' });
     revealReq.flush({
@@ -189,7 +189,8 @@ describe('SecretSantaApiService & AuthSessionStore', () => {
     });
   });
 
-  it('calls admin endpoints (getAdminGroup, removeParticipant, executeDraw, generatePasswordResetToken) and resetPin', () => {
+  it('calls admin endpoints (getAdminGroup, updateGroupPin, removeParticipant, executeDraw, generatePasswordResetToken) and resetPin', () => {
+    const groupId = '11111111-1111-1111-1111-111111111111';
     authStore.setSession({
       token: 'org-token',
       userId: 'org-1',
@@ -197,38 +198,43 @@ describe('SecretSantaApiService & AuthSessionStore', () => {
       username: 'org.user'
     });
 
-    service.getAdminGroup('grupo-x').subscribe();
-    const adminGet = httpMock.expectOne('/api/v1/groups/grupo-x/admin');
+    service.getAdminGroup(groupId).subscribe();
+    const adminGet = httpMock.expectOne(`/api/v1/groups/${groupId}/admin`);
     expect(adminGet.request.method).toBe('GET');
     expect(adminGet.request.headers.get('Authorization')).toBe('Bearer org-token');
     adminGet.flush({
-      id: 'g-1',
-      slug: 'grupo-x',
-      publicSlug: 'grupo-x',
+      id: groupId,
       eventName: 'Grupo X',
       organizerUserId: 'org-1',
       status: 'OPEN',
       geographicRestrictionRelaxed: false,
-      sharePath: '/g/grupo-x',
+      sharePath: `/g/${groupId}`,
       createdAt: '2026-11-13T18:00:00Z',
       drawnAt: null,
       participants: []
     });
 
-    service.removeParticipant('grupo-x', 'part-99').subscribe();
-    const delReq = httpMock.expectOne('/api/v1/groups/grupo-x/admin/participants/part-99');
+    service.updateGroupPin(groupId, { groupPin: '9988' }).subscribe();
+    const putPinReq = httpMock.expectOne(`/api/v1/groups/${groupId}/admin/pin`);
+    expect(putPinReq.request.method).toBe('PUT');
+    expect(putPinReq.request.headers.get('Authorization')).toBe('Bearer org-token');
+    expect(putPinReq.request.body).toEqual({ groupPin: '9988' });
+    putPinReq.flush(null);
+
+    service.removeParticipant(groupId, 'part-99').subscribe();
+    const delReq = httpMock.expectOne(`/api/v1/groups/${groupId}/admin/participants/part-99`);
     expect(delReq.request.method).toBe('DELETE');
     expect(delReq.request.headers.get('Authorization')).toBe('Bearer org-token');
     delReq.flush(null);
 
-    service.executeDraw('grupo-x').subscribe();
-    const drawReq = httpMock.expectOne('/api/v1/groups/grupo-x/admin/draw');
+    service.executeDraw(groupId).subscribe();
+    const drawReq = httpMock.expectOne(`/api/v1/groups/${groupId}/admin/draw`);
     expect(drawReq.request.method).toBe('POST');
     expect(drawReq.request.headers.get('Authorization')).toBe('Bearer org-token');
     drawReq.flush({});
 
-    service.generatePasswordResetToken('grupo-x', 'part-99').subscribe();
-    const resetTokReq = httpMock.expectOne('/api/v1/groups/grupo-x/admin/participants/part-99/reset-token');
+    service.generatePasswordResetToken(groupId, 'part-99').subscribe();
+    const resetTokReq = httpMock.expectOne(`/api/v1/groups/${groupId}/admin/participants/part-99/reset-token`);
     expect(resetTokReq.request.method).toBe('POST');
     expect(resetTokReq.request.headers.get('Authorization')).toBe('Bearer org-token');
     resetTokReq.flush({

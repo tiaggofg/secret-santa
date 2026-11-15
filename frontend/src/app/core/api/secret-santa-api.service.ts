@@ -16,7 +16,8 @@ import {
   RegisterUserRequest,
   ResetPinRequest,
   RevealMatchRequest,
-  RevealMatchView
+  RevealMatchView,
+  UpdateGroupPinRequest
 } from './secret-santa-api.models';
 
 @Injectable({
@@ -51,15 +52,15 @@ export class SecretSantaApiService {
     });
   }
 
-  getPublicGroup(slug: string): Observable<PublicGroupView> {
-    return this.http.get<PublicGroupView>(`${this.baseUrl}/groups/${encodeURIComponent(slug)}`, {
+  getPublicGroup(groupId: string): Observable<PublicGroupView> {
+    return this.http.get<PublicGroupView>(`${this.baseUrl}/groups/${encodeURIComponent(groupId)}`, {
       headers: this.buildAuthHeaders()
     });
   }
 
-  joinGroup(slug: string, request: JoinGroupRequest): Observable<ParticipantRegistrationView> {
+  joinGroup(groupId: string, request: JoinGroupRequest): Observable<ParticipantRegistrationView> {
     return this.http.post<ParticipantRegistrationView>(
-      `${this.baseUrl}/groups/${encodeURIComponent(slug)}/participants`,
+      `${this.baseUrl}/groups/${encodeURIComponent(groupId)}/participants`,
       request,
       {
         headers: this.buildAuthHeaders()
@@ -67,31 +68,41 @@ export class SecretSantaApiService {
     );
   }
 
-  revealMatch(slug: string, request: RevealMatchRequest): Observable<RevealMatchView> {
+  revealMatch(groupId: string, request: RevealMatchRequest): Observable<RevealMatchView> {
     return this.http.post<RevealMatchView>(
-      `${this.baseUrl}/groups/${encodeURIComponent(slug)}/participants/reveal`,
+      `${this.baseUrl}/groups/${encodeURIComponent(groupId)}/participants/reveal`,
       request
     );
   }
 
-  getAdminGroup(slug: string): Observable<AdminGroupView> {
-    return this.http.get<AdminGroupView>(`${this.baseUrl}/groups/${encodeURIComponent(slug)}/admin`, {
+  getAdminGroup(groupId: string): Observable<AdminGroupView> {
+    return this.http.get<AdminGroupView>(`${this.baseUrl}/groups/${encodeURIComponent(groupId)}/admin`, {
       headers: this.buildAuthHeaders()
     });
   }
 
-  removeParticipant(slug: string, participantId: string): Observable<void> {
-    return this.http.delete<void>(
-      `${this.baseUrl}/groups/${encodeURIComponent(slug)}/admin/participants/${encodeURIComponent(participantId)}`,
+  updateGroupPin(groupId: string, request: UpdateGroupPinRequest): Observable<void> {
+    return this.http.put<void>(
+      `${this.baseUrl}/groups/${encodeURIComponent(groupId)}/admin/pin`,
+      request,
       {
         headers: this.buildAuthHeaders()
       }
     );
   }
 
-  executeDraw(slug: string): Observable<AdminGroupView> {
+  removeParticipant(groupId: string, participantId: string): Observable<void> {
+    return this.http.delete<void>(
+      `${this.baseUrl}/groups/${encodeURIComponent(groupId)}/admin/participants/${encodeURIComponent(participantId)}`,
+      {
+        headers: this.buildAuthHeaders()
+      }
+    );
+  }
+
+  executeDraw(groupId: string): Observable<AdminGroupView> {
     return this.http.post<AdminGroupView>(
-      `${this.baseUrl}/groups/${encodeURIComponent(slug)}/admin/draw`,
+      `${this.baseUrl}/groups/${encodeURIComponent(groupId)}/admin/draw`,
       {},
       {
         headers: this.buildAuthHeaders()
@@ -99,9 +110,9 @@ export class SecretSantaApiService {
     );
   }
 
-  generatePasswordResetToken(slug: string, participantId: string): Observable<PasswordResetLinkView> {
+  generatePasswordResetToken(groupId: string, participantId: string): Observable<PasswordResetLinkView> {
     return this.http.post<PasswordResetLinkView>(
-      `${this.baseUrl}/groups/${encodeURIComponent(slug)}/admin/participants/${encodeURIComponent(participantId)}/reset-token`,
+      `${this.baseUrl}/groups/${encodeURIComponent(groupId)}/admin/participants/${encodeURIComponent(participantId)}/reset-token`,
       {},
       {
         headers: this.buildAuthHeaders()

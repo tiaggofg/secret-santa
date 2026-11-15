@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -177,30 +178,79 @@ class GroupAdminAndAuthControllerIT {
         MvcResult result = mockMvc.perform(post("/api/v1/groups")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + organizer.token())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of("eventName", "Natal da Família Silva"))))
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "eventName", "Natal da Família Silva",
+                                "groupPin", "4321"))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").isNotEmpty())
                 .andExpect(jsonPath("$.eventName").value("Natal da Família Silva"))
                 .andExpect(jsonPath("$.organizerUserId").value(organizer.userId().toString()))
                 .andExpect(jsonPath("$.status").value("OPEN"))
-                .andExpect(jsonPath("$.slug").isNotEmpty())
                 .andExpect(jsonPath("$.sharePath").isNotEmpty())
+                .andExpect(jsonPath("$.groupPinHash").doesNotExist())
                 .andReturn();
 
         JsonNode json = objectMapper.readTree(result.getResponse().getContentAsString());
-        String slug = json.get("slug").asText();
-        assertThat(json.get("sharePath").asText()).isEqualTo("/g/" + slug);
+        String id = json.get("id").asText();
+        assertThat(json.get("sharePath").asText()).isEqualTo("/g/" + id);
     }
 
     @Test
-    void shouldRejectGroupCreationWithShortOrInvalidEventNameWith400_C14() throws Exception {
+    void shouldRejectGroupCreationWithShortEventNameOrInvalidGroupPinWith400_C14() throws Exception {
         var organizer = applicationService.registerUser("Organizador", "org.curto", "1234");
 
         mockMvc.perform(post("/api/v1/groups")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + organizer.token())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of("eventName", "Oi"))))
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "eventName", "Oi",
+                                "groupPin", "1234"))))
                 .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/api/v1/groups")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + organizer.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "eventName", "Natal Válido",
+                                "groupPin", "12"))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldUpdateGroupPinViaPutAdminPinAndValidateNewPinOnJoin() throws Exception {
+        var organizer = applicationService.registerUser("Org", "org.pin", "1234");
+        var member = applicationService.registerUser("Membro", "mem.pin", "1234");
+
+        var group = applicationService.createGroup(organizer.userId(), "Natal Alterar PIN", "1111");
+
+        // Non-organizer cannot update PIN -> 403
+        mockMvc.perform(put("/api/v1/groups/{groupId}/admin/pin", group.id())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + member.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("groupPin", "9999"))))
+                .andExpect(status().isForbidden());
+
+        // Organizer updates PIN -> 204
+        mockMvc.perform(put("/api/v1/groups/{groupId}/admin/pin", group.id())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + organizer.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("groupPin", "9999"))))
+                .andExpect(status().isNoContent());
+
+        // Old PIN fails -> 403 INVALID_GROUP_PIN
+        mockMvc.perform(post("/api/v1/groups/{groupId}/participants", group.id())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + member.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("groupPin", "1111"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_GROUP_PIN"));
+
+        // New PIN succeeds -> 201
+        mockMvc.perform(post("/api/v1/groups/{groupId}/participants", group.id())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + member.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("groupPin", "9999"))))
+                .andExpect(status().isCreated());
     }
 
     @Test
@@ -209,13 +259,13 @@ class GroupAdminAndAuthControllerIT {
         var u2 = applicationService.registerUser("Bruno", "bruno", "2345");
         var u3 = applicationService.registerUser("Clara", "clara", "3456");
 
-        var group = applicationService.createGroup(organizer.userId(), "Natal Sigiloso");
-        applicationService.registerParticipant(group.slug(), organizer.userId(), -23.42, -51.93);
-        applicationService.registerParticipant(group.slug(), u2.userId(), -23.45, -51.95);
-        applicationService.registerParticipant(group.slug(), u3.userId(), null, null);
-        applicationService.executeDraw(group.slug(), organizer.userId());
+        var group = applicationService.createGroup(organizer.userId(), "Natal Sigiloso", "1234");
+        applicationService.registerParticipant(group.id(), organizer.userId(), null, -23.42, -51.93);
+        applicationService.registerParticipant(group.id(), u2.userId(), "1234", -23.45, -51.95);
+        applicationService.registerParticipant(group.id(), u3.userId(), "1234", null, null);
+        applicationService.executeDraw(group.id(), organizer.userId());
 
-        MvcResult result = mockMvc.perform(get("/api/v1/groups/{slug}/admin", group.slug())
+        MvcResult result = mockMvc.perform(get("/api/v1/groups/{groupId}/admin", group.id())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + organizer.token()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.eventName").value("Natal Sigiloso"))
@@ -231,7 +281,7 @@ class GroupAdminAndAuthControllerIT {
                 .andReturn();
 
         String rawJson = result.getResponse().getContentAsString();
-        assertThat(rawJson).doesNotContain("drawnParticipantId", "pinHash", "resetTokenHash");
+        assertThat(rawJson).doesNotContain("drawnParticipantId", "pinHash", "groupPinHash", "resetTokenHash");
     }
 
     @Test
@@ -241,22 +291,22 @@ class GroupAdminAndAuthControllerIT {
         var u3 = applicationService.registerUser("U3", "u3.del", "1234");
         var u4 = applicationService.registerUser("U4", "u4.del", "1234");
 
-        var group = applicationService.createGroup(organizer.userId(), "Natal Remoção");
-        ParticipantRegistrationView p1 = applicationService.registerParticipant(group.slug(), organizer.userId(), null, null);
-        applicationService.registerParticipant(group.slug(), u2.userId(), null, null);
-        applicationService.registerParticipant(group.slug(), u3.userId(), null, null);
-        ParticipantRegistrationView p4 = applicationService.registerParticipant(group.slug(), u4.userId(), null, null);
+        var group = applicationService.createGroup(organizer.userId(), "Natal Remoção", "1234");
+        ParticipantRegistrationView p1 = applicationService.registerParticipant(group.id(), organizer.userId(), null, null, null);
+        applicationService.registerParticipant(group.id(), u2.userId(), "1234", null, null);
+        applicationService.registerParticipant(group.id(), u3.userId(), "1234", null, null);
+        ParticipantRegistrationView p4 = applicationService.registerParticipant(group.id(), u4.userId(), "1234", null, null);
 
         // C17: Delete while OPEN -> 204
-        mockMvc.perform(delete("/api/v1/groups/{slug}/admin/participants/{participantId}", group.slug(), p4.id())
+        mockMvc.perform(delete("/api/v1/groups/{groupId}/admin/participants/{participantId}", group.id(), p4.id())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + organizer.token()))
                 .andExpect(status().isNoContent());
 
         // Draw group
-        applicationService.executeDraw(group.slug(), organizer.userId());
+        applicationService.executeDraw(group.id(), organizer.userId());
 
         // C18: Delete after DRAWN -> 409 Conflict
-        mockMvc.perform(delete("/api/v1/groups/{slug}/admin/participants/{participantId}", group.slug(), p1.id())
+        mockMvc.perform(delete("/api/v1/groups/{groupId}/admin/participants/{participantId}", group.id(), p1.id())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + organizer.token()))
                 .andExpect(status().isConflict());
     }
@@ -266,27 +316,27 @@ class GroupAdminAndAuthControllerIT {
         var organizer = applicationService.registerUser("Org", "org.guard", "1234");
         var otherUser = applicationService.registerUser("Outro", "outro.guard", "1234");
 
-        var group = applicationService.createGroup(organizer.userId(), "Natal Guard");
-        ParticipantRegistrationView p = applicationService.registerParticipant(group.slug(), otherUser.userId(), null, null);
+        var group = applicationService.createGroup(organizer.userId(), "Natal Guard", "1234");
+        ParticipantRegistrationView p = applicationService.registerParticipant(group.id(), otherUser.userId(), "1234", null, null);
 
         // Missing token -> 401
-        mockMvc.perform(get("/api/v1/groups/{slug}/admin", group.slug()))
+        mockMvc.perform(get("/api/v1/groups/{groupId}/admin", group.id()))
                 .andExpect(status().isUnauthorized());
 
         // Different authenticated user -> 403
-        mockMvc.perform(get("/api/v1/groups/{slug}/admin", group.slug())
+        mockMvc.perform(get("/api/v1/groups/{groupId}/admin", group.id())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + otherUser.token()))
                 .andExpect(status().isForbidden());
 
-        mockMvc.perform(delete("/api/v1/groups/{slug}/admin/participants/{participantId}", group.slug(), p.id())
+        mockMvc.perform(delete("/api/v1/groups/{groupId}/admin/participants/{participantId}", group.id(), p.id())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + otherUser.token()))
                 .andExpect(status().isForbidden());
 
-        mockMvc.perform(post("/api/v1/groups/{slug}/admin/draw", group.slug())
+        mockMvc.perform(post("/api/v1/groups/{groupId}/admin/draw", group.id())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + otherUser.token()))
                 .andExpect(status().isForbidden());
 
-        mockMvc.perform(post("/api/v1/groups/{slug}/admin/participants/{participantId}/reset-token", group.slug(), p.id())
+        mockMvc.perform(post("/api/v1/groups/{groupId}/admin/participants/{participantId}/reset-token", group.id(), p.id())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + otherUser.token()))
                 .andExpect(status().isForbidden());
     }
@@ -296,13 +346,13 @@ class GroupAdminAndAuthControllerIT {
         var organizer = applicationService.registerUser("Org", "org.reset", "1234");
         var member = applicationService.registerUser("Membro", "membro.reset", "1111");
 
-        var group = applicationService.createGroup(organizer.userId(), "Natal Reset");
-        ParticipantRegistrationView joined = applicationService.registerParticipant(group.slug(), member.userId(), null, null);
+        var group = applicationService.createGroup(organizer.userId(), "Natal Reset", "1234");
+        ParticipantRegistrationView joined = applicationService.registerParticipant(group.id(), member.userId(), "1234", null, null);
 
         // C20: Generate reset token link
         MvcResult tokenRes = mockMvc.perform(post(
-                        "/api/v1/groups/{slug}/admin/participants/{participantId}/reset-token",
-                        group.slug(),
+                        "/api/v1/groups/{groupId}/admin/participants/{participantId}/reset-token",
+                        group.id(),
                         joined.id())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + organizer.token()))
                 .andExpect(status().isOk())
@@ -370,20 +420,20 @@ class GroupAdminAndAuthControllerIT {
         var u2 = applicationService.registerUser("U2", "u2.draw", "1234");
         var u3 = applicationService.registerUser("U3", "u3.draw", "1234");
 
-        var group = applicationService.createGroup(organizer.userId(), "Natal Sorteio");
-        applicationService.registerParticipant(group.slug(), organizer.userId(), -23.42, -51.93);
-        applicationService.registerParticipant(group.slug(), u2.userId(), -23.45, -51.95);
+        var group = applicationService.createGroup(organizer.userId(), "Natal Sorteio", "1234");
+        applicationService.registerParticipant(group.id(), organizer.userId(), null, -23.42, -51.93);
+        applicationService.registerParticipant(group.id(), u2.userId(), "1234", -23.45, -51.95);
 
         // C23: Only 2 participants -> 422 Unprocessable Entity
-        mockMvc.perform(post("/api/v1/groups/{slug}/admin/draw", group.slug())
+        mockMvc.perform(post("/api/v1/groups/{groupId}/admin/draw", group.id())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + organizer.token()))
                 .andExpect(status().isUnprocessableEntity());
 
         // Add 3rd participant
-        applicationService.registerParticipant(group.slug(), u3.userId(), -23.48, -51.98);
+        applicationService.registerParticipant(group.id(), u3.userId(), "1234", -23.48, -51.98);
 
         // C22: 3 participants -> 200 OK and status DRAWN
-        mockMvc.perform(post("/api/v1/groups/{slug}/admin/draw", group.slug())
+        mockMvc.perform(post("/api/v1/groups/{groupId}/admin/draw", group.id())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + organizer.token()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("DRAWN"))
@@ -391,7 +441,7 @@ class GroupAdminAndAuthControllerIT {
                 .andExpect(jsonPath("$.drawnAt").isNotEmpty());
 
         // C24: Already DRAWN -> 409 Conflict
-        mockMvc.perform(post("/api/v1/groups/{slug}/admin/draw", group.slug())
+        mockMvc.perform(post("/api/v1/groups/{groupId}/admin/draw", group.id())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + organizer.token()))
                 .andExpect(status().isConflict());
     }

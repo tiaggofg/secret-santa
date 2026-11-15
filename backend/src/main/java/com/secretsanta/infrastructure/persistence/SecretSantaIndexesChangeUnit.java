@@ -29,8 +29,11 @@ public class SecretSantaIndexesChangeUnit {
         ensureIndex(userIndexOps, new Index().on("resetTokenHash", Sort.Direction.ASC).named("resetTokenHash"));
 
         IndexOperations groupIndexOps = mongoTemplate.indexOps(SecretSantaGroupDocument.class);
-        ensureIndex(groupIndexOps, new Index().on("publicSlug", Sort.Direction.ASC).named("publicSlug").unique());
+        if (groupIndexOps.getIndexInfo().stream().anyMatch(index -> "publicSlug".equals(index.getName()))) {
+            groupIndexOps.dropIndex("publicSlug");
+        }
         ensureIndex(groupIndexOps, new Index().on("organizerUserId", Sort.Direction.ASC).named("organizerUserId"));
+        ensureIndex(groupIndexOps, new Index().on("participants.userId", Sort.Direction.ASC).named("participants_userId"));
     }
 
     private static void ensureIndex(IndexOperations indexOps, Index index) {

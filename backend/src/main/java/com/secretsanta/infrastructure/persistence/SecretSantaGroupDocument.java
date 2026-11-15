@@ -14,10 +14,9 @@ public class SecretSantaGroupDocument {
     @Id
     private String id;
 
-    @Indexed(name = "publicSlug", unique = true)
-    private String publicSlug;
-
     private String eventName;
+
+    private String groupPinHash;
 
     @Indexed(name = "organizerUserId")
     private String organizerUserId;
@@ -40,8 +39,8 @@ public class SecretSantaGroupDocument {
 
     public SecretSantaGroupDocument(
             String id,
-            String publicSlug,
             String eventName,
+            String groupPinHash,
             String organizerUserId,
             String status,
             boolean geographicRestrictionRelaxed,
@@ -50,8 +49,8 @@ public class SecretSantaGroupDocument {
             Long version,
             List<ParticipantSubDocument> participants) {
         this.id = id;
-        this.publicSlug = publicSlug;
         this.eventName = eventName;
+        this.groupPinHash = groupPinHash;
         this.organizerUserId = organizerUserId;
         this.status = status;
         this.geographicRestrictionRelaxed = geographicRestrictionRelaxed;
@@ -69,20 +68,20 @@ public class SecretSantaGroupDocument {
         this.id = id;
     }
 
-    public String getPublicSlug() {
-        return publicSlug;
-    }
-
-    public void setPublicSlug(String publicSlug) {
-        this.publicSlug = publicSlug;
-    }
-
     public String getEventName() {
         return eventName;
     }
 
     public void setEventName(String eventName) {
         this.eventName = eventName;
+    }
+
+    public String getGroupPinHash() {
+        return groupPinHash;
+    }
+
+    public void setGroupPinHash(String groupPinHash) {
+        this.groupPinHash = groupPinHash;
     }
 
     public String getOrganizerUserId() {

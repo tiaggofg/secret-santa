@@ -18,9 +18,9 @@ import com.secretsanta.domain.exception.DuplicateUsernameException;
 import com.secretsanta.domain.exception.GroupAlreadyDrawnException;
 import com.secretsanta.domain.exception.GroupNotDrawnYetException;
 import com.secretsanta.domain.exception.InvalidCredentialsException;
+import com.secretsanta.domain.exception.InvalidGroupPinException;
 import com.secretsanta.domain.exception.InvalidPasswordResetTokenException;
 import com.secretsanta.domain.exception.UnauthorizedOrganizerAccessException;
-import com.secretsanta.domain.model.GroupSlug;
 import com.secretsanta.domain.model.GroupStatus;
 import com.secretsanta.domain.model.RevealStatus;
 import com.secretsanta.domain.model.SecretSantaGroup;
@@ -148,39 +148,35 @@ class SecretSantaApplicationServiceIT {
     }
 
     @Test
-    void shouldSeparateMyGroupsAndAvailableOpenGroupsForUser() {
+    void shouldListOnlyMyGroupsWhereUserIsOrganizerOrParticipant() {
         AuthSessionView alice = applicationService.registerUser("Alice", "alice", "1234");
         AuthSessionView bob = applicationService.registerUser("Bob", "bob", "1234");
         AuthSessionView carol = applicationService.registerUser("Carol", "carol", "1234");
         AuthSessionView dave = applicationService.registerUser("Dave", "dave", "1234");
 
-        // Group 1: Alice is organizer and participant
-        AdminGroupView group1 = applicationService.createGroup(alice.userId(), "Natal Família Alice");
-        applicationService.registerParticipant(group1.slug(), alice.userId(), -23.42, -51.93);
+        // Group 1: Alice is organizer and participant (no groupPin needed for organizer)
+        AdminGroupView group1 = applicationService.createGroup(alice.userId(), "Natal Família Alice", "1234");
+        applicationService.registerParticipant(group1.id(), alice.userId(), null, -23.42, -51.93);
 
-        // Group 2: Bob is organizer, Alice joined as participant
-        AdminGroupView group2 = applicationService.createGroup(bob.userId(), "Amigo Chocolate Bob");
-        applicationService.registerParticipant(group2.slug(), alice.userId(), null, null);
+        // Group 2: Bob is organizer, Alice joined as participant using groupPin
+        AdminGroupView group2 = applicationService.createGroup(bob.userId(), "Amigo Chocolate Bob", "5678");
+        applicationService.registerParticipant(group2.id(), alice.userId(), "5678", null, null);
 
         // Group 3: Bob is organizer, status OPEN, Alice has NOT joined
-        AdminGroupView group3 = applicationService.createGroup(bob.userId(), "Confraternização Aberta");
+        applicationService.createGroup(bob.userId(), "Confraternização Privada", "9999");
 
         // Group 4: Bob is organizer, status DRAWN, Alice is NOT participant
-        AdminGroupView group4 = applicationService.createGroup(bob.userId(), "Grupo Já Sorteado");
-        applicationService.registerParticipant(group4.slug(), bob.userId(), null, null);
-        applicationService.registerParticipant(group4.slug(), carol.userId(), null, null);
-        applicationService.registerParticipant(group4.slug(), dave.userId(), null, null);
-        applicationService.executeDraw(group4.slug(), bob.userId());
+        AdminGroupView group4 = applicationService.createGroup(bob.userId(), "Grupo Já Sorteado", "4321");
+        applicationService.registerParticipant(group4.id(), bob.userId(), null, null, null);
+        applicationService.registerParticipant(group4.id(), carol.userId(), "4321", null, null);
+        applicationService.registerParticipant(group4.id(), dave.userId(), "4321", null, null);
+        applicationService.executeDraw(group4.id(), bob.userId());
 
         GroupDiscoveryView discoveryForAlice = applicationService.listGroupsForUser(alice.userId());
 
         assertThat(discoveryForAlice.myGroups())
-                .extracting( SecretSantaApplicationService.GroupSummaryView::slug)
-                .containsExactlyInAnyOrder(group1.slug(), group2.slug());
-
-        assertThat(discoveryForAlice.availableGroups())
-                .extracting(SecretSantaApplicationService.GroupSummaryView::slug)
-                .containsExactly(group3.slug());
+                .extracting(SecretSantaApplicationService.GroupSummaryView::id)
+                .containsExactlyInAnyOrder(group1.id(), group2.id());
     }
 
     @Test
@@ -188,24 +184,27 @@ class SecretSantaApplicationServiceIT {
         AuthSessionView organizer = applicationService.registerUser("Organizador", "org.user", "1234");
         AuthSessionView intruder = applicationService.registerUser("Intruso", "intruder.user", "1234");
 
-        AdminGroupView group = applicationService.createGroup(organizer.userId(), "Natal Protegido");
+        AdminGroupView group = applicationService.createGroup(organizer.userId(), "Natal Protegido", "1234");
         ParticipantRegistrationView joined = applicationService.registerParticipant(
-                group.slug(), intruder.userId(), null, null);
+                group.id(), intruder.userId(), "1234", null, null);
 
-        assertThatThrownBy(() -> applicationService.getAdminGroup(group.slug(), intruder.userId()))
+        assertThatThrownBy(() -> applicationService.getAdminGroup(group.id(), intruder.userId()))
                 .isInstanceOf(UnauthorizedOrganizerAccessException.class);
 
-        assertThatThrownBy(() -> applicationService.removeParticipant(group.slug(), intruder.userId(), joined.id()))
+        assertThatThrownBy(() -> applicationService.updateGroupPin(group.id(), intruder.userId(), "9999"))
                 .isInstanceOf(UnauthorizedOrganizerAccessException.class);
 
-        assertThatThrownBy(() -> applicationService.executeDraw(group.slug(), intruder.userId()))
+        assertThatThrownBy(() -> applicationService.removeParticipant(group.id(), intruder.userId(), joined.id()))
+                .isInstanceOf(UnauthorizedOrganizerAccessException.class);
+
+        assertThatThrownBy(() -> applicationService.executeDraw(group.id(), intruder.userId()))
                 .isInstanceOf(UnauthorizedOrganizerAccessException.class);
 
         assertThatThrownBy(() -> applicationService.generatePasswordResetToken(
-                        group.slug(), intruder.userId(), joined.id()))
+                        group.id(), intruder.userId(), joined.id()))
                 .isInstanceOf(UnauthorizedOrganizerAccessException.class);
 
-        assertThatThrownBy(() -> applicationService.getAdminGroup(group.slug(), null))
+        assertThatThrownBy(() -> applicationService.getAdminGroup(group.id(), null))
                 .isInstanceOf(InvalidCredentialsException.class);
     }
 
@@ -213,7 +212,7 @@ class SecretSantaApplicationServiceIT {
     void shouldRetryParticipantRegistrationOnOptimisticLockingFailureAndSucceed() {
         AuthSessionView organizer = applicationService.registerUser("Org", "org.retry", "1234");
         AuthSessionView member = applicationService.registerUser("Membro", "membro.retry", "1234");
-        AdminGroupView group = applicationService.createGroup(organizer.userId(), "Grupo Retry Otimista");
+        AdminGroupView group = applicationService.createGroup(organizer.userId(), "Grupo Retry Otimista", "1234");
 
         AtomicInteger saveAttempts = new AtomicInteger(0);
         SecretSantaGroupRepository flakyGroupRepository = new SecretSantaGroupRepository() {
@@ -231,18 +230,8 @@ class SecretSantaApplicationServiceIT {
             }
 
             @Override
-            public Optional<SecretSantaGroup> findByPublicSlug(GroupSlug publicSlug) {
-                return groupRepository.findByPublicSlug(publicSlug);
-            }
-
-            @Override
-            public boolean existsByPublicSlug(GroupSlug publicSlug) {
-                return groupRepository.existsByPublicSlug(publicSlug);
-            }
-
-            @Override
-            public List<SecretSantaGroup> findAllOrderByCreatedAtDesc() {
-                return groupRepository.findAllOrderByCreatedAtDesc();
+            public List<SecretSantaGroup> findByUserParticipationOrOrganizationOrderByCreatedAtDesc(UUID userId) {
+                return groupRepository.findByUserParticipationOrOrganizationOrderByCreatedAtDesc(userId);
             }
         };
 
@@ -256,7 +245,7 @@ class SecretSantaApplicationServiceIT {
                 Clock.systemUTC());
 
         ParticipantRegistrationView registration = serviceWithFlakyRepo.registerParticipant(
-                group.slug(), member.userId(), -23.421, -51.933);
+                group.id(), member.userId(), "1234", -23.421, -51.933);
 
         assertThat(saveAttempts.get()).isEqualTo(3);
         assertThat(registration.userId()).isEqualTo(member.userId());
@@ -270,22 +259,22 @@ class SecretSantaApplicationServiceIT {
         AuthSessionView u3 = applicationService.registerUser("U3", "user.three", "1234");
         AuthSessionView u4 = applicationService.registerUser("U4", "user.four", "1234");
 
-        AdminGroupView group = applicationService.createGroup(u1.userId(), "Natal Exclusão");
-        ParticipantRegistrationView p1 = applicationService.registerParticipant(group.slug(), u1.userId(), null, null);
-        ParticipantRegistrationView p2 = applicationService.registerParticipant(group.slug(), u2.userId(), null, null);
-        ParticipantRegistrationView p3 = applicationService.registerParticipant(group.slug(), u3.userId(), null, null);
-        ParticipantRegistrationView p4 = applicationService.registerParticipant(group.slug(), u4.userId(), null, null);
+        AdminGroupView group = applicationService.createGroup(u1.userId(), "Natal Exclusão", "1234");
+        ParticipantRegistrationView p1 = applicationService.registerParticipant(group.id(), u1.userId(), null, null, null);
+        ParticipantRegistrationView p2 = applicationService.registerParticipant(group.id(), u2.userId(), "1234", null, null);
+        ParticipantRegistrationView p3 = applicationService.registerParticipant(group.id(), u3.userId(), "1234", null, null);
+        ParticipantRegistrationView p4 = applicationService.registerParticipant(group.id(), u4.userId(), "1234", null, null);
 
         // Remove p4 while OPEN
-        applicationService.removeParticipant(group.slug(), u1.userId(), p4.id());
-        AdminGroupView afterRemoval = applicationService.getAdminGroup(group.slug(), u1.userId());
+        applicationService.removeParticipant(group.id(), u1.userId(), p4.id());
+        AdminGroupView afterRemoval = applicationService.getAdminGroup(group.id(), u1.userId());
         assertThat(afterRemoval.participants()).hasSize(3);
 
         // Execute draw
-        applicationService.executeDraw(group.slug(), u1.userId());
+        applicationService.executeDraw(group.id(), u1.userId());
 
         // Attempt to remove p1 after draw must throw GroupAlreadyDrawnException
-        assertThatThrownBy(() -> applicationService.removeParticipant(group.slug(), u1.userId(), p1.id()))
+        assertThatThrownBy(() -> applicationService.removeParticipant(group.id(), u1.userId(), p1.id()))
                 .isInstanceOf(GroupAlreadyDrawnException.class);
         assertThat(p2.id()).isNotEqualTo(p3.id());
     }
@@ -296,34 +285,35 @@ class SecretSantaApplicationServiceIT {
         AuthSessionView bia = applicationService.registerUser("Bia", "bia", "2222");
         AuthSessionView caio = applicationService.registerUser("Caio", "caio", "3333");
 
-        AdminGroupView group = applicationService.createGroup(ana.userId(), "Natal Revelação");
-        applicationService.registerParticipant(group.slug(), ana.userId(), -23.4200, -51.9300);
-        applicationService.registerParticipant(group.slug(), bia.userId(), -23.4500, -51.9500);
-        applicationService.registerParticipant(group.slug(), caio.userId(), -23.4800, -51.9800);
+        AdminGroupView group = applicationService.createGroup(ana.userId(), "Natal Revelação", "1234");
+        applicationService.registerParticipant(group.id(), ana.userId(), null, -23.4200, -51.9300);
+        applicationService.registerParticipant(group.id(), bia.userId(), "1234", -23.4500, -51.9500);
+        applicationService.registerParticipant(group.id(), caio.userId(), "1234", -23.4800, -51.9800);
 
         // Reveal while OPEN must fail with GroupNotDrawnYetException
-        assertThatThrownBy(() -> applicationService.revealMatch(group.slug(), "ana", "1111"))
+        assertThatThrownBy(() -> applicationService.revealMatch(group.id(), "ana", "1111"))
                 .isInstanceOf(GroupNotDrawnYetException.class);
 
-        AdminGroupView drawnGroup = applicationService.executeDraw(group.slug(), ana.userId());
+        AdminGroupView drawnGroup = applicationService.executeDraw(group.id(), ana.userId());
         assertThat(drawnGroup.status()).isEqualTo(GroupStatus.DRAWN);
         assertThat(drawnGroup.geographicRestrictionRelaxed()).isFalse();
         assertThat(drawnGroup.participants())
                 .allSatisfy(p -> assertThat(p.revealStatus()).isEqualTo(RevealStatus.PENDING_REVEAL));
 
         // Wrong PIN or non-participant username must fail with InvalidCredentialsException
-        assertThatThrownBy(() -> applicationService.revealMatch(group.slug(), "ana", "9999"))
+        assertThatThrownBy(() -> applicationService.revealMatch(group.id(), "ana", "9999"))
                 .isInstanceOf(InvalidCredentialsException.class);
-        assertThatThrownBy(() -> applicationService.revealMatch(group.slug(), "desconhecido", "1111"))
+        assertThatThrownBy(() -> applicationService.revealMatch(group.id(), "desconhecido", "1111"))
                 .isInstanceOf(InvalidCredentialsException.class);
 
         // Valid reveal
-        RevealMatchView reveal = applicationService.revealMatch(group.slug(), "ANA", "1111");
+        RevealMatchView reveal = applicationService.revealMatch(group.id(), "ANA", "1111");
         assertThat(reveal.username()).isEqualTo("ana");
         assertThat(reveal.drawnParticipantName()).isIn("Bia", "Caio");
         assertThat(reveal.revealedAt()).isNotNull();
 
-        PublicGroupView publicAfterReveal = applicationService.getPublicGroup(group.slug(), ana.userId());
+        PublicGroupView publicAfterReveal = applicationService.getPublicGroup(group.id(), ana.userId());
+        assertThat(publicAfterReveal.participantsVisible()).isTrue();
         assertThat(publicAfterReveal.participants())
                 .filteredOn(p -> p.username().equals("ana"))
                 .singleElement()
@@ -345,12 +335,12 @@ class SecretSantaApplicationServiceIT {
         AuthSessionView org = timeControlledService.registerUser("Organizador", "org.reset", "1234");
         AuthSessionView lucas = timeControlledService.registerUser("Lucas", "lucas.silva", "1111");
 
-        AdminGroupView group = timeControlledService.createGroup(org.userId(), "Natal Reset PIN");
+        AdminGroupView group = timeControlledService.createGroup(org.userId(), "Natal Reset PIN", "1234");
         ParticipantRegistrationView lucasParticipant = timeControlledService.registerParticipant(
-                group.slug(), lucas.userId(), null, null);
+                group.id(), lucas.userId(), "1234", null, null);
 
         PasswordResetLinkView resetLink = timeControlledService.generatePasswordResetToken(
-                group.slug(), org.userId(), lucasParticipant.id());
+                group.id(), org.userId(), lucasParticipant.id());
 
         assertThat(resetLink.resetToken()).isNotBlank();
         assertThat(resetLink.resetPath()).isEqualTo("/reset/" + resetLink.resetToken());
@@ -372,7 +362,7 @@ class SecretSantaApplicationServiceIT {
 
     @Test
     void shouldNeverExposeDrawnParticipantIdPinHashOrResetTokenHashInAnyViewDto() throws Exception {
-        Set<String> forbiddenFields = Set.of("drawnParticipantId", "pinHash", "resetTokenHash");
+        Set<String> forbiddenFields = Set.of("drawnParticipantId", "pinHash", "groupPinHash", "resetTokenHash");
         List<Class<?>> dtoClasses = List.of(
                 AuthSessionView.class,
                 SecretSantaApplicationService.GroupSummaryView.class,
@@ -399,31 +389,45 @@ class SecretSantaApplicationServiceIT {
         AuthSessionView u2 = applicationService.registerUser("P2", "p2.sec", "2345");
         AuthSessionView u3 = applicationService.registerUser("P3", "p3.sec", "3456");
 
-        AdminGroupView group = applicationService.createGroup(u1.userId(), "Grupo Sigilo");
-        applicationService.registerParticipant(group.slug(), u1.userId(), null, null);
-        applicationService.registerParticipant(group.slug(), u2.userId(), null, null);
-        applicationService.registerParticipant(group.slug(), u3.userId(), null, null);
+        AdminGroupView group = applicationService.createGroup(u1.userId(), "Grupo Sigilo", "1234");
+        applicationService.registerParticipant(group.id(), u1.userId(), null, null, null);
+        applicationService.registerParticipant(group.id(), u2.userId(), "1234", null, null);
+        applicationService.registerParticipant(group.id(), u3.userId(), "1234", null, null);
 
-        AdminGroupView drawnAdminView = applicationService.executeDraw(group.slug(), u1.userId());
-        PublicGroupView drawnPublicView = applicationService.getPublicGroup(group.slug(), u1.userId());
+        AdminGroupView drawnAdminView = applicationService.executeDraw(group.id(), u1.userId());
+        PublicGroupView drawnPublicView = applicationService.getPublicGroup(group.id(), u1.userId());
 
         String adminJson = objectMapper.writeValueAsString(drawnAdminView);
         String publicJson = objectMapper.writeValueAsString(drawnPublicView);
 
-        assertThat(adminJson).doesNotContain("drawnParticipantId", "pinHash", "resetTokenHash");
-        assertThat(publicJson).doesNotContain("drawnParticipantId", "pinHash", "resetTokenHash");
+        assertThat(adminJson).doesNotContain("drawnParticipantId", "pinHash", "groupPinHash", "resetTokenHash");
+        assertThat(publicJson).doesNotContain("drawnParticipantId", "pinHash", "groupPinHash", "resetTokenHash");
     }
 
     @Test
-    void shouldSupportDirectVisitorRegistrationAndGroupJoinInSingleFlow() {
+    void shouldSupportDirectVisitorRegistrationAndGroupJoinAndAvoidOrphanUserOnWrongGroupPin() {
         AuthSessionView org = applicationService.registerUser("Organizador", "org.whats", "1234");
-        AdminGroupView group = applicationService.createGroup(org.userId(), "Grupo Link WhatsApp");
+        AdminGroupView group = applicationService.createGroup(org.userId(), "Grupo Link WhatsApp", "7788");
+
+        // Wrong group PIN must fail BEFORE creating user account
+        assertThatThrownBy(() -> applicationService.registerVisitorAndJoinGroup(
+                        group.id(),
+                        "Orphan User",
+                        "orphan.user",
+                        "4321",
+                        "0000",
+                        -23.42,
+                        -51.93))
+                .isInstanceOf(InvalidGroupPinException.class);
+
+        assertThat(userAccountRepository.findByUsername(new Username("orphan.user"))).isEmpty();
 
         ParticipantRegistrationView joinedVisitor = applicationService.registerVisitorAndJoinGroup(
-                group.slug(),
+                group.id(),
                 "Tia Maria",
                 "tia.maria",
                 "4321",
+                "7788",
                 -23.42,
                 -51.93);
 
@@ -434,7 +438,7 @@ class SecretSantaApplicationServiceIT {
 
         // Trying to join the same group again must fail with DuplicateParticipantException
         assertThatThrownBy(() -> applicationService.registerParticipant(
-                        group.slug(), joinedVisitor.userId(), null, null))
+                        group.id(), joinedVisitor.userId(), "7788", null, null))
                 .isInstanceOf(DuplicateParticipantException.class);
     }
 }
