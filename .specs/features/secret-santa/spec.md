@@ -9,10 +9,10 @@ Organizar um Amigo Secreto em família frequentemente esbarra na fricção de ap
 
 ## Goals
 
-- [ ] Permitir que cada familiar faça um cadastro básico rápido (**Nome**, **Username** único e **PIN numérico de 4 a 6 dígitos**) e visualize imediatamente os **Grupos Disponíveis (Abertos)** para se inscrever com 1 toque e a lista **Meus Grupos**, além de poder ingressar diretamente pelo link enviado no WhatsApp (`/g/{slug}`).
-- [ ] Permitir que qualquer usuário logado crie um grupo de Amigo Secreto informando apenas o nome do evento (tornando-se automaticamente o **Organizador** do grupo, sem precisar de outra senha separada) e permitir o cadastro sequencial de familiares/dependentes no mesmo aparelho reutilizando o GPS em memória.
-- [ ] Garantir sorteio justo por desarranjo matemático (*derangement*) com restrição automática de núcleo familiar num raio de 50 metros via Haversine e fallback automático caso a distribuição torne a restrição matematicamente impossível.
-- [ ] Garantir sigilo absoluto dos pares sorteados (ocultos inclusive para o organizador), revelação protegida por `username` + `PIN`, redefinição de PIN via link de uso único (`/reset/{token}`) gerado pelo organizador e limpeza imediata de estado na revelação ("Passar o Celular").
+- [x] Permitir que cada familiar faça um cadastro básico rápido (**Nome**, **Username** único e **PIN numérico de 4 a 6 dígitos**) e visualize imediatamente os **Grupos Disponíveis (Abertos)** para se inscrever com 1 toque e a lista **Meus Grupos**, além de poder ingressar diretamente pelo link enviado no WhatsApp (`/g/{slug}`).
+- [x] Permitir que qualquer usuário logado crie um grupo de Amigo Secreto informando apenas o nome do evento (tornando-se automaticamente o **Organizador** do grupo, sem precisar de outra senha separada) e permitir o cadastro sequencial de familiares/dependentes no mesmo aparelho reutilizando o GPS em memória.
+- [x] Garantir sorteio justo por desarranjo matemático (*derangement*) com restrição automática de núcleo familiar num raio de 50 metros via Haversine e fallback automático caso a distribuição torne a restrição matematicamente impossível.
+- [x] Garantir sigilo absoluto dos pares sorteados (ocultos inclusive para o organizador), revelação protegida por `username` + `PIN`, redefinição de PIN via link de uso único (`/reset/{token}`) gerado pelo organizador e limpeza imediata de estado na revelação ("Passar o Celular").
 
 ## Out of Scope
 
@@ -184,9 +184,9 @@ Each requirement gets a unique ID for tracking across design, tasks, and validat
 
 How we know the feature is successful:
 
-- [ ] Cadastro básico de um usuário em navegador mobile (Nome, Username sugerido/editável e PIN numérico de 4-6 dígitos) e inscrição em um grupo disponível ou via link direto concluídos em menos de 15 segundos.
-- [ ] Cadastro sequencial de familiar/dependente ("Cadastrar outro familiar / Trocar de usuário neste aparelho") concluído sem exigir nova permissão de GPS.
-- [ ] 100% dos sorteios em cenários matematicamente possíveis (`max_cluster <= N/2`) geram zero pares dentro do mesmo raio de 50 metros.
-- [ ] 100% dos sorteios em cenários matematicamente impossíveis (`max_cluster > N/2`) completam com sucesso via fallback automático em menos de 500ms sem lançar erro ao usuário.
-- [ ] Redefinição de PIN via link único `/reset/{token}` permite ao participante trocar seu PIN em 1 passo sem expor a nova senha nem o amigo secreto ao organizador.
-- [ ] Zero bytes de dados sensíveis (`drawnParticipantName` ou `pin`) persistidos em `localStorage`, `sessionStorage` ou DOM após fechamento do modal de revelação.
+- [x] Cadastro básico de um usuário em navegador mobile (Nome, Username sugerido/editável e PIN numérico de 4-6 dígitos) e inscrição em um grupo disponível ou via link direto concluídos em menos de 15 segundos.
+- [x] Cadastro sequencial de familiar/dependente ("Cadastrar outro familiar / Trocar de usuário neste aparelho") concluído sem exigir nova permissão de GPS.
+- [x] 100% dos sorteios em cenários matematicamente possíveis (`max_cluster <= N/2`) geram zero pares dentro do mesmo raio de 50 metros.
+- [x] 100% dos sorteios em cenários matematicamente impossíveis (`max_cluster > N/2`) completam com sucesso via fallback automático em menos de 500ms sem lançar erro ao usuário.
+- [x] Redefinição de PIN via link único `/reset/{token}` permite ao participante trocar seu PIN em 1 passo sem expor a nova senha nem o amigo secreto ao organizador.
+- [x] Zero bytes de dados sensíveis (`drawnParticipantName` ou `pin`) persistidos em `localStorage`, `sessionStorage` ou DOM após fechamento do modal de revelação.

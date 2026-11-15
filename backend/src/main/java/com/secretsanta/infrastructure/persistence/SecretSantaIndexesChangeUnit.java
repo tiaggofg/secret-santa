@@ -4,9 +4,11 @@ import io.mongock.api.annotations.ChangeUnit;
 import io.mongock.api.annotations.Execution;
 import io.mongock.api.annotations.RollbackExecution;
 import jakarta.annotation.PostConstruct;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.index.Index;
+import org.springframework.data.mongodb.core.index.IndexOperations;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -22,14 +24,23 @@ public class SecretSantaIndexesChangeUnit {
     @PostConstruct
     @Execution
     public void ensureIndexes() {
-        mongoTemplate.indexOps(UserAccountDocument.class)
-                .createIndex(new Index().on("username", Sort.Direction.ASC).unique());
-        mongoTemplate.indexOps(UserAccountDocument.class)
-                .createIndex(new Index().on("resetTokenHash", Sort.Direction.ASC));
-        mongoTemplate.indexOps(SecretSantaGroupDocument.class)
-                .createIndex(new Index().on("publicSlug", Sort.Direction.ASC).unique());
-        mongoTemplate.indexOps(SecretSantaGroupDocument.class)
-                .createIndex(new Index().on("organizerUserId", Sort.Direction.ASC));
+        IndexOperations userIndexOps = mongoTemplate.indexOps(UserAccountDocument.class);
+        ensureIndex(userIndexOps, new Index().on("username", Sort.Direction.ASC).named("username").unique());
+        ensureIndex(userIndexOps, new Index().on("resetTokenHash", Sort.Direction.ASC).named("resetTokenHash"));
+
+        IndexOperations groupIndexOps = mongoTemplate.indexOps(SecretSantaGroupDocument.class);
+        ensureIndex(groupIndexOps, new Index().on("publicSlug", Sort.Direction.ASC).named("publicSlug").unique());
+        ensureIndex(groupIndexOps, new Index().on("organizerUserId", Sort.Direction.ASC).named("organizerUserId"));
+    }
+
+    private static void ensureIndex(IndexOperations indexOps, Index index) {
+        try {
+            indexOps.createIndex(index);
+        } catch (DataIntegrityViolationException ex) {
+            if (ex.getMessage() == null || !ex.getMessage().contains("IndexOptionsConflict")) {
+                throw ex;
+            }
+        }
     }
 
     @RollbackExecution

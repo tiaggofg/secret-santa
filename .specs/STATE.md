@@ -45,10 +45,10 @@
 ## Handoff
 
 - **Feature**: secret-santa (`.specs/features/secret-santa`)
-- **Phase / Task**: Design & Tasks consolidados com `AD-001` a `AD-005` (sem decisões descontinuadas pendentes) — aguardando aprovação de `tasks.md` para iniciar `Execute` (`T1`..`T17`)
-- **Completed**: `spec.md` (Approved), `design.md`, `tasks.md`
+- **Phase / Task**: Done — todas as 17 tarefas (`T1`..`T17`), `proofs.md` (`39 pass, 0 fail`) e `verification.md` (`PASS`) concluídos
+- **Completed**: `T1`..`T17`, `proofs.md`, `verification.md`
 - **In-progress** (file:line): none
-- **Next step**: Aprovar `tasks.md` (e escolher execução via sub-agents por fase ou inline) para iniciar a Fase 1 (`T1`)
-- **Blockers**: Aprovação do usuário em `tasks.md`
-- **Uncommitted files**: `.specs/STATE.md`, `.specs/features/secret-santa/spec.md`, `.specs/features/secret-santa/design.md`, `.specs/features/secret-santa/tasks.md`
+- **Next step**: Pronto para uso local ou início de novas features pós-MVP em `.specs/features/<nova-feature>/`
+- **Blockers**: none
+- **Uncommitted files**: none
 - **Branch**: main

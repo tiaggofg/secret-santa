@@ -9,7 +9,7 @@ Implement these tasks with the `tlc-spec-driven` skill: **activate it by name an
 ---
 
 **Design**: `.specs/features/secret-santa/design.md`
-**Status**: In Progress
+**Status**: Done
 **Approved**: 2026-11-13 - user: "Está aprovado"
 **Build**: `test ! -f backend/pom.xml || JAVA_HOME=/usr/lib/jvm/jdk-25.0.4.1+1 mvn -f backend/pom.xml test-compile; test ! -f frontend/package.json || npm --prefix frontend run build`
 **Run backend**: `JAVA_HOME=/usr/lib/jvm/jdk-25.0.4.1+1 mvn -f backend/pom.xml test`
@@ -577,8 +577,8 @@ Proof: run backend | GroupAdminAndAuthControllerIT
 The feature's live state, written as it happens - a compaction gives no warning.
 
 **Settled mid-build:** none
-**Dispatched:** Batch 1 (Phase 1: T1-T6) at HEAD e767279 (returned at f9de550); Batch 2 (Phase 2: T7-T10) at HEAD f9de550 (returned at 907ce58); Batch 3 (Phase 3: T11-T17) at HEAD 907ce58
-**Walked:** pending execution
+**Dispatched:** Batch 1 (Phase 1: T1-T6) at HEAD e767279 (returned at f9de550); Batch 2 (Phase 2: T7-T10) at HEAD f9de550 (returned at 907ce58); Batch 3 (Phase 3: T11-T17) at HEAD 907ce58 (returned at 288f186); Verifier at HEAD 288f186 (returned PASS)
+**Walked:** All 4 P1 stories verified end-to-end across `/` (registration, login, myGroups, availableGroups, family switch), `/g/:slug` (direct WhatsApp link join + username/PIN reveal with ephemeral modal wipe), `/g/:slug/admin` (organizer dashboard, share, draw, reset token generation), and `/reset/:token` (one-time PIN reset).
 
 ---
 

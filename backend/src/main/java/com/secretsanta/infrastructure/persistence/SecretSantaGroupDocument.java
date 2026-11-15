@@ -14,12 +14,12 @@ public class SecretSantaGroupDocument {
     @Id
     private String id;
 
-    @Indexed(unique = true)
+    @Indexed(name = "publicSlug", unique = true)
     private String publicSlug;
 
     private String eventName;
 
-    @Indexed
+    @Indexed(name = "organizerUserId")
     private String organizerUserId;
 
     private String status;

@@ -16,12 +16,12 @@ public class UserAccountDocument {
 
     private String normalizedName;
 
-    @Indexed(unique = true)
+    @Indexed(name = "username", unique = true)
     private String username;
 
     private String pinHash;
 
-    @Indexed
+    @Indexed(name = "resetTokenHash")
     private String resetTokenHash;
 
     private Instant resetTokenExpiresAt;
