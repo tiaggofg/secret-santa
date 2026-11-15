@@ -116,3 +116,13 @@ Após concluir qualquer implementação ou correção no projeto, além de garan
 2. **Implementações Exclusivamente no Backend (Somente Backend)**:
    - Realize **requisições HTTP reais (requests)** diretamente contra os endpoints da API do backend em execução (via `curl`, scripts de request ou cliente HTTP equivalente), validando contratos de entrada/saída, códigos de status HTTP, persistência e cenários de erro.
    - Não é necessário abrir o navegador/Playwright quando a alteração for estritamente de backend sem impacto em fluxos de UI.
+
+---
+
+## 7. Regra Obrigatória de Aprovação, Commit e Push Pós-Ciclo
+
+Ao finalizar qualquer ciclo completo de implementação e verificação:
+
+1. **Solicitação de Aprovação**: Você **DEVE** perguntar explicitamente ao usuário se as alterações estão aprovadas.
+2. **Commit e Push após Aprovação**: Caso o usuário confirme a aprovação, você **DEVE** realizar o `git add`, `git commit` (com mensagem descritiva seguindo Conventional Commits) e `git push` para o repositório remoto.
+3. **Sem Push Antes da Aprovação**: Nunca execute `git commit` ou `git push` antes de receber a aprovação explícita do usuário para o ciclo concluído.
