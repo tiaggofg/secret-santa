@@ -10,5 +10,6 @@ services:
     environment:
       MONGODB_URI: ${MONGODB_URI:?Defina MONGODB_URI com a string de conexão do MongoDB}
       SECRETSANTA_TOKEN_SECRET: ${SECRETSANTA_TOKEN_SECRET:?Defina SECRETSANTA_TOKEN_SECRET com pelo menos 32 caracteres}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?Defina CORS_ALLOWED_ORIGINS com as origens permitidas}
     extra_hosts:
       - "host.docker.internal:host-gateway"
