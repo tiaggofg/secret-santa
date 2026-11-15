@@ -195,19 +195,23 @@ describe('PublicGroupPageComponent', () => {
     expect(fixture.nativeElement.querySelector('[data-testid="visitor-register-form"]')).not.toBeNull();
   });
 
-  it('displays reveal form and participant list when DRAWN, pre-filling username when clicking a participant item (C29)', () => {
+  it('displays reveal form and participant list when DRAWN with human labels, pre-filling username when clicking a participant item (C29)', () => {
     apiMock.getPublicGroup.mockReturnValue(of(drawnGroupMock));
     component.loadPublicGroup();
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('[data-testid="reveal-form-section"]')).not.toBeNull();
-    expect(fixture.nativeElement.textContent).toContain('PENDING_REVEAL');
-    expect(fixture.nativeElement.textContent).toContain('REVEALED');
+    expect(fixture.nativeElement.textContent).toContain('Ainda não espiou');
+    expect(fixture.nativeElement.textContent).toContain('Já descobriu');
+    expect(fixture.nativeElement.textContent).not.toContain('PENDING_REVEAL');
+    expect(fixture.nativeElement.textContent).not.toContain('REVEALED');
 
     const items: NodeListOf<HTMLButtonElement> = fixture.nativeElement.querySelectorAll(
       '[data-testid="participant-list-item"]'
     );
     expect(items.length).toBe(2);
+    expect(items[0].getAttribute('data-reveal-status')).toBe('PENDING_REVEAL');
+    expect(items[1].getAttribute('data-reveal-status')).toBe('REVEALED');
     items[0].click();
     fixture.detectChanges();
 

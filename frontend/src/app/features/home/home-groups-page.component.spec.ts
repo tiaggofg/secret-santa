@@ -6,7 +6,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { HomeGroupsPageComponent } from './home-groups-page.component';
 import { SecretSantaApiService } from '../../core/api/secret-santa-api.service';
 import { AuthSessionStore } from '../../core/auth/auth-session.store';
-import { BrowserGeolocationService } from '../../core/geolocation/browser-geolocation.service';
 import { DeviceSessionGeoStore } from '../../core/geolocation/device-session-geo.store';
 
 describe('HomeGroupsPageComponent', () => {
@@ -19,12 +18,7 @@ describe('HomeGroupsPageComponent', () => {
     register: vi.fn(),
     login: vi.fn(),
     listGroups: vi.fn(),
-    joinGroup: vi.fn(),
     createGroup: vi.fn()
-  };
-
-  const geoServiceMock = {
-    captureCoordinatesForJoin: vi.fn()
   };
 
   beforeEach(async () => {
@@ -73,8 +67,7 @@ describe('HomeGroupsPageComponent', () => {
         provideRouter([]),
         AuthSessionStore,
         DeviceSessionGeoStore,
-        { provide: SecretSantaApiService, useValue: apiMock },
-        { provide: BrowserGeolocationService, useValue: geoServiceMock }
+        { provide: SecretSantaApiService, useValue: apiMock }
       ]
     }).compileComponents();
 
@@ -85,7 +78,7 @@ describe('HomeGroupsPageComponent', () => {
     fixture.detectChanges();
   });
 
-  it('auto-suggests username from name during basic registration and loads My Groups & Available Groups on submit', () => {
+  it('auto-suggests username from name during basic registration and displays only My Groups on submit', () => {
     apiMock.register.mockReturnValue(
       of({
         token: 'tok-reg',
@@ -120,8 +113,8 @@ describe('HomeGroupsPageComponent', () => {
     expect(apiMock.listGroups).toHaveBeenCalled();
     expect(fixture.nativeElement.textContent).toContain('Meus Grupos');
     expect(fixture.nativeElement.textContent).toContain('Natal Família Godoy');
-    expect(fixture.nativeElement.textContent).toContain('Grupos Disponíveis (Abertos)');
-    expect(fixture.nativeElement.textContent).toContain('Amigo Secreto dos Primos');
+    expect(fixture.nativeElement.querySelector('[data-testid="available-groups-section"]')).toBeNull();
+    expect(fixture.nativeElement.textContent).not.toContain('Amigo Secreto dos Primos');
   });
 
   it('shows helpful suggestion when registration fails with HTTP 409 duplicate username', () => {
@@ -141,7 +134,7 @@ describe('HomeGroupsPageComponent', () => {
     expect(alert?.textContent).toContain('já está em uso');
   });
 
-  it('logs in existing user with username + PIN and displays groups', () => {
+  it('logs in existing user with username + PIN and displays only My Groups', () => {
     apiMock.login.mockReturnValue(
       of({
         token: 'tok-login',
@@ -169,10 +162,10 @@ describe('HomeGroupsPageComponent', () => {
     });
     expect(authStore.isAuthenticated()).toBe(true);
     expect(component.myGroups().length).toBe(1);
-    expect(component.availableGroups().length).toBe(1);
+    expect(fixture.nativeElement.querySelector('[data-testid="available-groups-section"]')).toBeNull();
   });
 
-  it('joins an available group with 1 tap using GPS coordinates when granted', async () => {
+  it('opens create group modal from button, submits eventName and closes modal on success', () => {
     authStore.setSession({
       token: 'tok-1',
       userId: 'u-1',
@@ -181,90 +174,15 @@ describe('HomeGroupsPageComponent', () => {
     });
     fixture.detectChanges();
 
-    geoServiceMock.captureCoordinatesForJoin.mockResolvedValue({
-      latitude: -23.42,
-      longitude: -51.93,
-      fallbackUsed: false,
-      reusedFromSession: false
-    });
-    apiMock.joinGroup.mockReturnValue(
-      of({
-        id: 'p-1',
-        userId: 'u-1',
-        name: 'Tiago Godoy',
-        username: 'tiago.godoy',
-        hasGeoLocation: true,
-        revealStatus: 'WAITING_DRAW',
-        createdAt: '2026-11-13T18:15:00Z',
-        groupSlug: 'primos-2026',
-        token: null
-      })
+    expect(fixture.nativeElement.querySelector('[data-testid="create-group-modal"]')).toBeNull();
+
+    const openModalBtn: HTMLButtonElement = fixture.nativeElement.querySelector(
+      '[data-testid="open-create-group-modal-btn"]'
     );
-
-    const joinBtn: HTMLButtonElement = fixture.nativeElement.querySelector('[data-testid="join-group-btn"]');
-    joinBtn.click();
-    await fixture.whenStable();
+    openModalBtn.click();
     fixture.detectChanges();
 
-    expect(geoServiceMock.captureCoordinatesForJoin).toHaveBeenCalledTimes(1);
-    expect(apiMock.joinGroup).toHaveBeenCalledWith('primos-2026', {
-      latitude: -23.42,
-      longitude: -51.93
-    });
-    expect(fixture.nativeElement.querySelector('[data-testid="geo-fallback-notice"]')).toBeNull();
-  });
-
-  it('completes group join with latitude=null and longitude=null and displays non-blocking notice when GPS is denied or times out (C9)', async () => {
-    authStore.setSession({
-      token: 'tok-1',
-      userId: 'u-1',
-      name: 'Tiago Godoy',
-      username: 'tiago.godoy'
-    });
-    fixture.detectChanges();
-
-    geoServiceMock.captureCoordinatesForJoin.mockResolvedValue({
-      latitude: null,
-      longitude: null,
-      fallbackUsed: true,
-      reusedFromSession: false
-    });
-    apiMock.joinGroup.mockReturnValue(
-      of({
-        id: 'p-2',
-        userId: 'u-1',
-        name: 'Tiago Godoy',
-        username: 'tiago.godoy',
-        hasGeoLocation: false,
-        revealStatus: 'WAITING_DRAW',
-        createdAt: '2026-11-13T18:16:00Z',
-        groupSlug: 'primos-2026',
-        token: null
-      })
-    );
-
-    const joinBtn: HTMLButtonElement = fixture.nativeElement.querySelector('[data-testid="join-group-btn"]');
-    joinBtn.click();
-    await fixture.whenStable();
-    fixture.detectChanges();
-
-    expect(apiMock.joinGroup).toHaveBeenCalledWith('primos-2026', {
-      latitude: null,
-      longitude: null
-    });
-    const fallbackBanner = fixture.nativeElement.querySelector('[data-testid="geo-fallback-notice"]');
-    expect(fallbackBanner).not.toBeNull();
-    expect(fallbackBanner.textContent).toContain('sem GPS');
-  });
-
-  it('creates a new group when authenticated user submits eventName', () => {
-    authStore.setSession({
-      token: 'tok-1',
-      userId: 'u-1',
-      name: 'Tiago Godoy',
-      username: 'tiago.godoy'
-    });
-    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-testid="create-group-modal"]')).not.toBeNull();
 
     apiMock.createGroup.mockReturnValue(
       of({
@@ -288,10 +206,11 @@ describe('HomeGroupsPageComponent', () => {
     fixture.detectChanges();
 
     expect(apiMock.createGroup).toHaveBeenCalledWith({ eventName: 'Natal 2026' });
+    expect(fixture.nativeElement.querySelector('[data-testid="create-group-modal"]')).toBeNull();
     expect(fixture.nativeElement.textContent).toContain('Grupo "Natal 2026" criado com sucesso!');
   });
 
-  it('clears AuthSessionStore in memory while preserving DeviceSessionGeoStore when clicking switch family user button (C12)', () => {
+  it('clears AuthSessionStore in memory while preserving DeviceSessionGeoStore when clicking discreet switch user button (C12)', () => {
     authStore.setSession({
       token: 'tok-parent',
       userId: 'u-parent',
@@ -304,7 +223,7 @@ describe('HomeGroupsPageComponent', () => {
     const switchBtn: HTMLButtonElement = fixture.nativeElement.querySelector(
       '[data-testid="switch-family-user-btn"]'
     );
-    expect(switchBtn.textContent).toContain('Cadastrar outro familiar / Trocar de usuário neste aparelho');
+    expect(switchBtn).not.toBeNull();
     switchBtn.click();
     fixture.detectChanges();
 

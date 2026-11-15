@@ -8,17 +8,19 @@ import {
   PasswordResetLinkView
 } from '../../core/api/secret-santa-api.models';
 import { ShareLinkService } from '../../core/share/share-link.service';
+import { FestiveIconComponent } from '../../shared/components/festive-icon.component';
+import { formatParticipantCount, getAvatarTone, getInitials } from '../../shared/formatters';
 
 @Component({
   selector: 'app-admin-dashboard-page',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, FestiveIconComponent],
   template: `
     <div class="space-y-6">
-      <div class="flex items-center justify-between">
+      <div class="flex flex-wrap items-center justify-between gap-2">
         <a
           routerLink="/"
-          class="text-sm font-semibold text-emerald-800 hover:underline inline-flex items-center gap-1"
+          class="min-h-11 text-sm font-semibold text-pine-800 hover:underline inline-flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 rounded-lg px-1"
         >
           ← Voltar para Meus Grupos
         </a>
@@ -26,9 +28,9 @@ import { ShareLinkService } from '../../core/share/share-link.service';
           <a
             [routerLink]="['/g', g.slug]"
             data-testid="view-public-group-link"
-            class="text-sm font-semibold text-slate-700 hover:underline"
+            class="min-h-11 text-sm font-semibold text-ink-900 hover:underline inline-flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 rounded-lg px-1"
           >
-            Página Pública
+            Página Pública →
           </a>
         }
       </div>
@@ -37,7 +39,7 @@ import { ShareLinkService } from '../../core/share/share-link.service';
         <div
           role="alert"
           data-testid="admin-error"
-          class="rounded-xl bg-red-50 border border-red-200 p-4 text-sm text-red-800 font-medium"
+          class="rounded-2xl bg-cranberry-50 border border-cranberry-200 p-4 text-sm text-cranberry-800 font-medium break-words"
         >
           {{ errorMessage() }}
         </div>
@@ -47,67 +49,144 @@ import { ShareLinkService } from '../../core/share/share-link.service';
         <div
           role="status"
           data-testid="share-feedback"
-          class="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-900 font-medium"
+          class="rounded-2xl bg-pine-50 border border-pine-200 p-3.5 text-sm text-pine-900 font-medium break-all"
         >
           {{ shareFeedback() }}
         </div>
       }
 
       @if (group(); as g) {
-        <section class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+        <section class="bg-festive-card border border-festive-border rounded-3xl p-5 shadow-sm space-y-4">
           <div class="flex items-start justify-between gap-3">
-            <div>
-              <span class="text-xs font-bold uppercase tracking-wider text-emerald-800">
+            <div class="min-w-0">
+              <span class="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-gold-600">
+                <app-festive-icon name="star" svgClass="w-3.5 h-3.5" />
                 Painel do Organizador
               </span>
-              <h1 class="text-xl font-bold text-slate-900 mt-0.5">{{ g.eventName }}</h1>
+              <h1 class="font-display text-2xl font-bold text-ink-900 mt-0.5 break-words leading-tight">
+                {{ g.eventName }}
+              </h1>
             </div>
             <span
               data-testid="group-status-badge"
+              [attr.data-group-status]="g.status"
               [class]="
                 g.status === 'DRAWN'
-                  ? 'px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 text-xs font-bold'
-                  : 'px-3 py-1 rounded-full bg-amber-100 text-amber-900 text-xs font-bold'
+                  ? 'px-3 py-1 rounded-full bg-cranberry-50 border border-cranberry-200 text-cranberry-800 text-xs font-bold shrink-0'
+                  : 'px-3 py-1 rounded-full bg-gold-100 border border-gold-200 text-gold-900 text-xs font-bold shrink-0'
               "
             >
-              {{ g.status === 'DRAWN' ? 'DRAWN (Sorteado)' : 'OPEN (Inscrições Abertas)' }}
+              {{ g.status === 'DRAWN' ? 'Sorteio Realizado' : 'Inscrições Abertas' }}
             </span>
+          </div>
+
+          <!-- Summary Metric Pills -->
+          <div class="flex flex-wrap gap-2">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-festive-cream border border-festive-border text-xs font-semibold text-ink-900 tabular-nums">
+              {{ participantCountLabel(g.participants.length) }}
+            </span>
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-pine-50 border border-pine-200 text-xs font-semibold text-pine-900 tabular-nums">
+              <app-festive-icon name="gps" svgClass="w-3.5 h-3.5 text-pine-800" />
+              {{ geoProtectedCount() }} com proteção GPS 50m
+            </span>
+            @if (g.status === 'DRAWN') {
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cranberry-50 border border-cranberry-200 text-xs font-semibold text-cranberry-800 tabular-nums">
+                <app-festive-icon name="gift-open" svgClass="w-3.5 h-3.5" />
+                {{ revealedCount() }} de {{ g.participants.length }} já descobriram
+              </span>
+            }
           </div>
 
           @if (g.status === 'DRAWN' && g.geographicRestrictionRelaxed) {
             <div
               data-testid="geo-relaxed-badge"
-              class="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900"
+              class="rounded-2xl bg-gold-50 border border-gold-200 p-3 text-xs text-gold-950 break-words"
             >
-              Nota técnica: mais de 50% dos inscritos estavam na mesma residência, portanto o relaxamento geográfico automático foi acionado para garantir o sorteio.
+              Nota do sorteio: mais de 50% dos inscritos estavam na mesma residência, portanto o relaxamento geográfico automático foi acionado para garantir que todos participassem.
             </div>
           }
 
-          <button
-            type="button"
-            data-testid="share-group-link-btn"
-            (click)="shareGroupInviteLink(g)"
-            class="w-full min-h-12 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm px-4 py-3 shadow-sm transition flex items-center justify-center gap-2"
-          >
-            <span>Compartilhar Link do Grupo no WhatsApp ({{ g.sharePath }})</span>
-          </button>
+          <!-- Share Group Invite -->
+          <div class="space-y-2">
+            <button
+              type="button"
+              data-testid="share-group-link-btn"
+              (click)="shareGroupInviteLink(g)"
+              class="w-full min-h-12 rounded-xl bg-pine-800 hover:bg-pine-900 text-white font-bold text-sm px-4 py-3 shadow-sm transition flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+            >
+              <app-festive-icon name="share" svgClass="w-4 h-4" />
+              <span>Convidar Família no WhatsApp</span>
+            </button>
+
+            <div class="flex items-center justify-between gap-2 rounded-xl bg-festive-cream border border-festive-border px-3 py-2">
+              <span class="text-xs font-mono text-ink-600 break-all">
+                {{ g.sharePath || '/g/' + g.slug }}
+              </span>
+              <button
+                type="button"
+                (click)="copyGroupPath(g)"
+                class="min-h-9 px-2.5 rounded-lg bg-white border border-festive-border hover:bg-stone-100 text-ink-900 text-xs font-semibold inline-flex items-center gap-1 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+              >
+                <app-festive-icon name="copy" svgClass="w-3.5 h-3.5" />
+                <span>Copiar</span>
+              </button>
+            </div>
+          </div>
 
           @if (g.status === 'OPEN') {
-            <div class="pt-2 border-t border-slate-100 space-y-2">
+            <div class="pt-3 border-t border-festive-border space-y-3">
               @if (!canExecuteDraw()) {
-                <p data-testid="min-participants-hint" class="text-xs text-slate-600">
+                <p data-testid="min-participants-hint" class="text-xs text-ink-600">
                   São necessários pelo menos 3 participantes inscritos para realizar o sorteio (atual: {{ g.participants.length }}).
                 </p>
               }
-              <button
-                type="button"
-                data-testid="execute-draw-btn"
-                [disabled]="!canExecuteDraw() || isBusy()"
-                (click)="onExecuteDraw()"
-                class="w-full min-h-12 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white font-bold text-base shadow-sm transition"
-              >
-                Realizar Sorteio Agora ({{ g.participants.length }} inscritos)
-              </button>
+
+              @if (!confirmDrawPending()) {
+                <button
+                  type="button"
+                  data-testid="execute-draw-btn"
+                  [disabled]="!canExecuteDraw() || isBusy()"
+                  (click)="confirmDrawPending.set(true)"
+                  class="w-full min-h-12 rounded-xl bg-cranberry-700 hover:bg-cranberry-800 disabled:opacity-40 text-white font-bold text-base shadow-sm transition flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                >
+                  <app-festive-icon name="gift" svgClass="w-5 h-5" />
+                  <span>Realizar Sorteio Agora ({{ g.participants.length }} inscritos)</span>
+                </button>
+              } @else {
+                <!-- Inline Expandable Confirmation -->
+                <div class="rounded-2xl bg-cranberry-50 border-2 border-cranberry-200 p-4 space-y-3 animate-fade-slide-up">
+                  <p class="text-sm font-bold text-cranberry-800">
+                    Confirmar realização do sorteio?
+                  </p>
+                  <p class="text-xs text-ink-900 leading-relaxed">
+                    Esta ação é definitiva: após o sorteio, não será mais possível remover participantes deste grupo.
+                  </p>
+                  <div class="flex flex-col sm:flex-row gap-2">
+                    <button
+                      type="button"
+                      data-testid="confirm-draw-btn"
+                      [disabled]="isBusy()"
+                      (click)="onExecuteDraw()"
+                      class="flex-1 min-h-12 rounded-xl bg-cranberry-700 hover:bg-cranberry-800 disabled:opacity-60 text-white font-bold text-sm px-4 py-2.5 shadow-sm transition flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                    >
+                      @if (isBusy()) {
+                        <app-festive-icon name="spinner" svgClass="w-4 h-4" />
+                        <span>Sorteando...</span>
+                      } @else {
+                        <span>Sim, Sortear Agora!</span>
+                      }
+                    </button>
+                    <button
+                      type="button"
+                      [disabled]="isBusy()"
+                      (click)="confirmDrawPending.set(false)"
+                      class="min-h-12 rounded-xl bg-white border border-stone-300 hover:bg-stone-50 text-ink-900 font-semibold text-sm px-4 py-2.5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              }
             </div>
           }
         </section>
@@ -115,32 +194,43 @@ import { ShareLinkService } from '../../core/share/share-link.service';
         @if (activeResetLink(); as resetInfo) {
           <section
             data-testid="generated-reset-link-card"
-            class="bg-amber-50 border border-amber-300 rounded-2xl p-4 space-y-3"
+            class="bg-gold-50 border border-gold-300 rounded-3xl p-4 sm:p-5 space-y-3 shadow-sm animate-fade-slide-up"
           >
-            <h2 class="text-sm font-bold text-amber-950">
-              Link Único de Redefinição de PIN para &#64;{{ resetInfo.username }}
-            </h2>
-            <p class="text-xs text-amber-900 break-all font-mono bg-white p-2.5 rounded-lg border border-amber-200">
+            <div class="flex items-start justify-between gap-2">
+              <div class="flex items-center gap-2 min-w-0">
+                <app-festive-icon name="key" svgClass="w-5 h-5 text-gold-600 shrink-0" />
+                <h2 class="text-sm font-bold text-gold-950 break-words">
+                  Link de Redefinição para &#64;{{ resetInfo.username }}
+                </h2>
+              </div>
+              <span class="px-2.5 py-0.5 rounded-full bg-gold-100 border border-gold-200 text-gold-900 text-[11px] font-bold shrink-0">
+                Uso único • Válido por 24h
+              </span>
+            </div>
+
+            <p class="text-xs text-gold-900 break-all font-mono bg-white p-3 rounded-xl border border-gold-200">
               {{ resetInfo.resetPath }}
             </p>
+
             <button
               type="button"
               data-testid="share-reset-link-btn"
               (click)="shareResetLink(resetInfo)"
-              class="w-full min-h-12 rounded-xl bg-amber-800 hover:bg-amber-900 text-white font-bold text-xs px-3 py-2"
+              class="w-full min-h-12 rounded-xl bg-gold-800 hover:bg-gold-900 text-white font-bold text-sm px-4 py-2.5 shadow-sm transition flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
             >
-              Compartilhar Link de Redefinição no WhatsApp
+              <app-festive-icon name="share" svgClass="w-4 h-4" />
+              <span>Enviar no WhatsApp</span>
             </button>
           </section>
         }
 
         <section class="space-y-3" data-testid="participants-section">
-          <h2 class="text-lg font-bold text-slate-900">
+          <h2 class="font-display text-lg font-bold text-ink-900">
             Participantes Inscritos ({{ g.participants.length }})
           </h2>
 
           @if (g.participants.length === 0) {
-            <p class="text-sm text-slate-500 bg-slate-50 border border-slate-200 rounded-xl p-4">
+            <p class="text-sm text-ink-600 bg-white border border-festive-border rounded-2xl p-4">
               Nenhum participante inscrito ainda. Compartilhe o link do grupo no WhatsApp da família!
             </p>
           } @else {
@@ -148,38 +238,54 @@ import { ShareLinkService } from '../../core/share/share-link.service';
               @for (p of g.participants; track p.id) {
                 <div
                   data-testid="admin-participant-row"
-                  class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3"
+                  class="bg-festive-card border border-festive-border rounded-2xl p-4 shadow-sm space-y-3"
                 >
                   <div class="flex items-start justify-between gap-2">
-                    <div>
-                      <p class="font-bold text-slate-900 text-base">{{ p.name }}</p>
-                      <p class="text-xs text-slate-600">&#64;{{ p.username }}</p>
+                    <div class="flex items-center gap-3 min-w-0">
+                      <div
+                        [class]="
+                          'w-10 h-10 rounded-xl border font-display font-bold text-xs flex items-center justify-center shrink-0 ' +
+                          avatarTone(p.name)
+                        "
+                      >
+                        {{ initials(p.name) }}
+                      </div>
+                      <div class="min-w-0">
+                        <p class="font-bold text-ink-900 text-base truncate">{{ p.name }}</p>
+                        <p class="text-xs text-ink-600 truncate">&#64;{{ p.username }}</p>
+                      </div>
                     </div>
-                    <div class="flex flex-col items-end gap-1">
+                    <div class="flex flex-col items-end gap-1 shrink-0">
                       <span
                         data-testid="participant-geo-badge"
-                        class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-medium"
+                        class="text-xs px-2.5 py-0.5 rounded-full bg-festive-cream border border-festive-border text-ink-900 font-medium"
                       >
                         {{ p.hasGeoLocation ? 'GPS Ativo (50m)' : 'Sem GPS' }}
                       </span>
                       <span
                         data-testid="participant-reveal-badge"
-                        class="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 font-semibold"
+                        [attr.data-reveal-status]="p.revealStatus"
+                        [class]="
+                          p.revealStatus === 'REVEALED'
+                            ? 'text-xs px-2.5 py-0.5 rounded-full bg-pine-100 text-pine-900 font-semibold'
+                            : 'text-xs px-2.5 py-0.5 rounded-full bg-gold-50 border border-gold-200 text-gold-900 font-semibold'
+                        "
                       >
                         {{ formatRevealStatus(p) }}
                       </span>
                     </div>
                   </div>
 
-                  <div class="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+                  <div class="flex flex-wrap gap-2 pt-2 border-t border-festive-border">
                     <button
                       type="button"
                       data-testid="generate-reset-token-btn"
                       [disabled]="isBusy()"
                       (click)="onGenerateResetToken(p)"
-                      class="flex-1 min-h-12 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs px-3 py-2"
+                      class="flex-1 min-h-12 rounded-xl bg-festive-cream hover:bg-stone-200/70 border border-festive-border text-ink-900 font-semibold text-xs px-3 py-2 inline-flex items-center justify-center gap-1.5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
                     >
-                      Gerar Link de Reset de PIN
+                      <app-festive-icon name="key" svgClass="w-3.5 h-3.5 text-gold-600" />
+                      <span>Gerar Link de Reset de PIN</span>
                     </button>
 
                     @if (g.status === 'OPEN') {
@@ -188,7 +294,7 @@ import { ShareLinkService } from '../../core/share/share-link.service';
                         data-testid="remove-participant-btn"
                         [disabled]="isBusy()"
                         (click)="onRemoveParticipant(p)"
-                        class="min-h-12 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 font-semibold text-xs px-3 py-2"
+                        class="min-h-12 rounded-xl bg-cranberry-50 hover:bg-cranberry-100 border border-cranberry-200 text-cranberry-800 font-semibold text-xs px-3.5 py-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
                       >
                         Remover
                       </button>
@@ -210,6 +316,7 @@ export class AdminDashboardPageComponent implements OnInit {
 
   readonly group = signal<AdminGroupView | null>(null);
   readonly isBusy = signal<boolean>(false);
+  readonly confirmDrawPending = signal<boolean>(false);
   readonly errorMessage = signal<string | null>(null);
   readonly shareFeedback = signal<string | null>(null);
   readonly activeResetLink = signal<PasswordResetLinkView | null>(null);
@@ -219,6 +326,16 @@ export class AdminDashboardPageComponent implements OnInit {
     return current !== null && current.status === 'OPEN' && current.participants.length >= 3;
   });
 
+  readonly geoProtectedCount = computed(() => {
+    const current = this.group();
+    return current ? current.participants.filter((p) => p.hasGeoLocation).length : 0;
+  });
+
+  readonly revealedCount = computed(() => {
+    const current = this.group();
+    return current ? current.participants.filter((p) => p.revealStatus === 'REVEALED').length : 0;
+  });
+
   private slug = '';
 
   ngOnInit(): void {
@@ -226,6 +343,18 @@ export class AdminDashboardPageComponent implements OnInit {
     if (this.slug) {
       this.loadAdminGroup();
     }
+  }
+
+  participantCountLabel(count: number): string {
+    return formatParticipantCount(count);
+  }
+
+  initials(name: string): string {
+    return getInitials(name);
+  }
+
+  avatarTone(name: string): string {
+    return getAvatarTone(name);
   }
 
   loadAdminGroup(): void {
@@ -250,7 +379,7 @@ export class AdminDashboardPageComponent implements OnInit {
     this.shareFeedback.set(null);
     const result = await this.shareService.shareLink({
       title: `Amigo Secreto: ${g.eventName}`,
-      text: `Participe do grupo "${g.eventName}" no Amigo Secreto Familiar!`,
+      text: `Participe do grupo "${g.eventName}" no Amigo Secreto!`,
       pathOrUrl: g.sharePath || `/g/${g.slug}`
     });
     this.shareFeedback.set(
@@ -258,6 +387,10 @@ export class AdminDashboardPageComponent implements OnInit {
         ? 'Link do grupo compartilhado com sucesso!'
         : `Link copiado para a área de transferência: ${result.url}`
     );
+  }
+
+  async copyGroupPath(g: AdminGroupView): Promise<void> {
+    await this.shareGroupInviteLink(g);
   }
 
   onRemoveParticipant(participant: AdminParticipantView): void {
@@ -269,6 +402,7 @@ export class AdminDashboardPageComponent implements OnInit {
     this.apiService.removeParticipant(this.slug, participant.id).subscribe({
       next: () => {
         this.isBusy.set(false);
+        this.confirmDrawPending.set(false);
         this.loadAdminGroup();
       },
       error: () => {
@@ -287,11 +421,13 @@ export class AdminDashboardPageComponent implements OnInit {
     this.apiService.executeDraw(this.slug).subscribe({
       next: (updatedGroup) => {
         this.isBusy.set(false);
+        this.confirmDrawPending.set(false);
         this.group.set(updatedGroup);
         this.shareFeedback.set('Sorteio realizado com sucesso! Os participantes já podem consultar quem tiraram.');
       },
       error: (err: HttpErrorResponse) => {
         this.isBusy.set(false);
+        this.confirmDrawPending.set(false);
         if (err.status === 422) {
           this.errorMessage.set('São necessários no mínimo 3 participantes para realizar o sorteio.');
         } else {
@@ -336,11 +472,11 @@ export class AdminDashboardPageComponent implements OnInit {
   formatRevealStatus(participant: AdminParticipantView): string {
     switch (participant.revealStatus) {
       case 'REVEALED':
-        return 'Já consultou (REVEALED)';
+        return 'Já descobriu';
       case 'PENDING_REVEAL':
-        return 'Pendente (PENDING_REVEAL)';
+        return 'Ainda não espiou';
       default:
-        return 'Aguardando sorteio (WAITING_DRAW)';
+        return 'Aguardando sorteio';
     }
   }
 }

@@ -13,17 +13,19 @@ import { BrowserGeolocationService } from '../../core/geolocation/browser-geoloc
 import { DeviceSessionGeoStore } from '../../core/geolocation/device-session-geo.store';
 import { EphemeralRevealModalComponent } from './ephemeral-reveal-modal.component';
 import { HomeGroupsPageComponent } from '../home/home-groups-page.component';
+import { FestiveIconComponent } from '../../shared/components/festive-icon.component';
+import { formatParticipantCount, getAvatarTone, getInitials } from '../../shared/formatters';
 
 @Component({
   selector: 'app-public-group-page',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, EphemeralRevealModalComponent],
+  imports: [ReactiveFormsModule, RouterLink, EphemeralRevealModalComponent, FestiveIconComponent],
   template: `
     <div class="space-y-6">
-      <div class="flex items-center justify-between">
+      <div class="flex flex-wrap items-center justify-between gap-2">
         <a
           routerLink="/"
-          class="text-sm font-semibold text-emerald-800 hover:underline inline-flex items-center gap-1"
+          class="min-h-11 text-sm font-semibold text-pine-800 hover:underline inline-flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 rounded-lg px-1"
         >
           ← Ir para Todos os Grupos
         </a>
@@ -32,7 +34,7 @@ import { HomeGroupsPageComponent } from '../home/home-groups-page.component';
             <a
               [routerLink]="['/g', g.slug, 'admin']"
               data-testid="organizer-admin-link"
-              class="text-sm font-bold text-emerald-800 hover:underline"
+              class="min-h-11 text-sm font-bold text-pine-800 hover:underline inline-flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 rounded-lg px-1"
             >
               Painel do Organizador →
             </a>
@@ -44,7 +46,7 @@ import { HomeGroupsPageComponent } from '../home/home-groups-page.component';
         <div
           role="alert"
           data-testid="public-group-error"
-          class="rounded-xl bg-red-50 border border-red-200 p-3.5 text-sm text-red-800 font-medium"
+          class="rounded-2xl bg-cranberry-50 border border-cranberry-200 p-3.5 text-sm text-cranberry-800 font-medium break-words"
         >
           {{ errorMessage() }}
         </div>
@@ -54,9 +56,19 @@ import { HomeGroupsPageComponent } from '../home/home-groups-page.component';
         <div
           role="status"
           data-testid="public-group-status"
-          class="rounded-xl bg-emerald-50 border border-emerald-200 p-3.5 text-sm text-emerald-900 font-medium"
+          class="rounded-2xl bg-pine-50 border border-pine-200 p-3.5 text-sm text-pine-900 font-medium break-words"
         >
           {{ statusMessage() }}
+        </div>
+      }
+
+      @if (capturingGeo()) {
+        <div
+          role="status"
+          class="rounded-2xl bg-gold-50 border border-gold-200 p-3.5 text-sm text-gold-900 font-medium flex items-center gap-2.5"
+        >
+          <app-festive-icon name="spinner" svgClass="w-5 h-5 text-gold-600" />
+          <span>Verificando localização da casa...</span>
         </div>
       }
 
@@ -64,35 +76,48 @@ import { HomeGroupsPageComponent } from '../home/home-groups-page.component';
         <div
           role="status"
           data-testid="public-geo-fallback-notice"
-          class="rounded-xl bg-amber-50 border border-amber-300 p-3.5 text-sm text-amber-900"
+          class="rounded-2xl bg-gold-50 border border-gold-300 p-3.5 text-sm text-gold-950 break-words"
         >
           Inscrição concluída sem GPS: a restrição residencial automática de 50 metros não será aplicada a este cadastro.
         </div>
       }
 
       @if (group(); as g) {
-        <section class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-2">
+        <!-- Festive Invitation Card -->
+        <section class="bg-festive-card border border-festive-border rounded-3xl p-5 shadow-sm space-y-3 relative overflow-hidden">
           <div class="flex items-start justify-between gap-2">
-            <div>
-              <span class="text-xs font-bold uppercase tracking-wider text-emerald-800">
-                Grupo de Amigo Secreto
+            <div class="min-w-0 space-y-1">
+              <span class="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-pine-800">
+                <app-festive-icon name="pine" svgClass="w-3.5 h-3.5 text-pine-800" />
+                Convite de Natal
               </span>
-              <h1 class="text-xl font-bold text-slate-900">{{ g.eventName }}</h1>
+              <h1 class="font-display text-2xl font-bold text-ink-900 break-words leading-tight">
+                {{ g.eventName }}
+              </h1>
             </div>
             <span
               data-testid="public-group-status-badge"
+              [attr.data-group-status]="g.status"
               [class]="
                 g.status === 'DRAWN'
-                  ? 'px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 text-xs font-bold'
-                  : 'px-3 py-1 rounded-full bg-amber-100 text-amber-900 text-xs font-bold'
+                  ? 'px-3 py-1 rounded-full bg-cranberry-50 border border-cranberry-200 text-cranberry-800 text-xs font-bold shrink-0'
+                  : 'px-3 py-1 rounded-full bg-gold-100 border border-gold-200 text-gold-900 text-xs font-bold shrink-0'
               "
             >
               {{ g.status === 'DRAWN' ? 'Sorteio Realizado' : 'Inscrições Abertas' }}
             </span>
           </div>
-          <p class="text-xs text-slate-600">
-            {{ g.participants.length }} participante(s) inscrito(s)
-          </p>
+
+          <div class="flex flex-wrap items-center gap-2 pt-1">
+            <span class="text-xs font-semibold text-ink-600 tabular-nums">
+              {{ participantCountLabel(g.participants.length) }}
+            </span>
+            @if (g.status === 'OPEN' && g.participants.length < 3) {
+              <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-gold-50 border border-gold-200 text-gold-900 text-xs font-semibold">
+                {{ missingParticipantsLabel(g.participants.length) }}
+              </span>
+            }
+          </div>
         </section>
 
         @if (g.status === 'OPEN') {
@@ -100,38 +125,46 @@ import { HomeGroupsPageComponent } from '../home/home-groups-page.component';
           @if (!authStore.isAuthenticated()) {
             <section
               data-testid="whatsapp-visitor-join-section"
-              class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4"
+              class="bg-festive-card border border-festive-border rounded-3xl p-5 shadow-sm space-y-4"
             >
-              <div class="space-y-1">
-                <h2 class="text-lg font-bold text-slate-900">
-                  Entrar em "{{ g.eventName }}"
+              <div class="space-y-1.5">
+                <h2 class="font-display text-lg font-bold text-ink-900">
+                  Você foi convidado para este Amigo Secreto!
                 </h2>
-                <p class="text-xs text-slate-600">
-                  Crie seu cadastro básico (ou entre com sua conta) e você será inscrito automaticamente neste grupo.
+                <p class="text-xs text-ink-600 leading-relaxed">
+                  Crie seu cadastro rápido (ou entre com sua conta) para participar de "{{ g.eventName }}".
+                </p>
+                <p class="text-xs text-pine-800 font-medium flex items-center gap-1.5">
+                  <app-festive-icon name="gps" svgClass="w-3.5 h-3.5 shrink-0" />
+                  <span>Usamos sua localização só para evitar tirar quem mora na mesma casa</span>
                 </p>
               </div>
 
-              <div class="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl" role="tablist">
+              <div class="grid grid-cols-2 gap-2 bg-festive-cream border border-festive-border p-1.5 rounded-2xl" role="tablist">
                 <button
                   type="button"
+                  role="tab"
+                  [attr.aria-selected]="visitorMode() === 'register'"
                   data-testid="visitor-tab-register"
                   (click)="setVisitorMode('register')"
                   [class]="
                     visitorMode() === 'register'
-                      ? 'min-h-12 rounded-lg bg-white text-emerald-800 font-semibold shadow-sm text-sm'
-                      : 'min-h-12 rounded-lg text-slate-700 font-medium text-sm'
+                      ? 'min-h-12 rounded-xl bg-white text-pine-900 font-bold shadow-sm text-sm border border-festive-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500'
+                      : 'min-h-12 rounded-xl text-ink-600 font-semibold text-sm hover:text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500'
                   "
                 >
                   Novo Cadastro
                 </button>
                 <button
                   type="button"
+                  role="tab"
+                  [attr.aria-selected]="visitorMode() === 'login'"
                   data-testid="visitor-tab-login"
                   (click)="setVisitorMode('login')"
                   [class]="
                     visitorMode() === 'login'
-                      ? 'min-h-12 rounded-lg bg-white text-emerald-800 font-semibold shadow-sm text-sm'
-                      : 'min-h-12 rounded-lg text-slate-700 font-medium text-sm'
+                      ? 'min-h-12 rounded-xl bg-white text-pine-900 font-bold shadow-sm text-sm border border-festive-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500'
+                      : 'min-h-12 rounded-xl text-ink-600 font-semibold text-sm hover:text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500'
                   "
                 >
                   Já tenho conta
@@ -146,7 +179,7 @@ import { HomeGroupsPageComponent } from '../home/home-groups-page.component';
                   class="space-y-4"
                 >
                   <div>
-                    <label for="vis-name" class="block text-sm font-semibold text-slate-800 mb-1">
+                    <label for="vis-name" class="block text-sm font-semibold text-ink-900 mb-1.5">
                       Nome
                     </label>
                     <input
@@ -155,12 +188,12 @@ import { HomeGroupsPageComponent } from '../home/home-groups-page.component';
                       formControlName="name"
                       (input)="onVisitorNameInput()"
                       placeholder="Ex: Joãozinho Silva"
-                      class="w-full min-h-12 rounded-xl border border-slate-300 px-3.5 py-2.5 text-base focus:border-emerald-600 focus:outline-none"
+                      class="w-full min-h-12 rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-base text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
                     />
                   </div>
 
                   <div>
-                    <label for="vis-username" class="block text-sm font-semibold text-slate-800 mb-1">
+                    <label for="vis-username" class="block text-sm font-semibold text-ink-900 mb-1.5">
                       Username
                     </label>
                     <input
@@ -170,32 +203,47 @@ import { HomeGroupsPageComponent } from '../home/home-groups-page.component';
                       (input)="onVisitorUsernameManualEdit()"
                       placeholder="Ex: joaozinho.silva"
                       autocapitalize="none"
-                      class="w-full min-h-12 rounded-xl border border-slate-300 px-3.5 py-2.5 text-base lowercase focus:border-emerald-600 focus:outline-none"
+                      class="w-full min-h-12 rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-base lowercase text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
                     />
                   </div>
 
                   <div>
-                    <label for="vis-pin" class="block text-sm font-semibold text-slate-800 mb-1">
+                    <label for="vis-pin" class="block text-sm font-semibold text-ink-900 mb-1.5">
                       PIN Numérico (4 a 6 dígitos)
                     </label>
-                    <input
-                      id="vis-pin"
-                      type="password"
-                      inputmode="numeric"
-                      maxlength="6"
-                      formControlName="pin"
-                      placeholder="Ex: 1234"
-                      class="w-full min-h-12 rounded-xl border border-slate-300 px-3.5 py-2.5 text-lg tracking-widest focus:border-emerald-600 focus:outline-none"
-                    />
+                    <div class="relative flex items-center">
+                      <input
+                        id="vis-pin"
+                        [type]="showVisitorRegPin() ? 'text' : 'password'"
+                        inputmode="numeric"
+                        maxlength="6"
+                        formControlName="pin"
+                        placeholder="Ex: 1234"
+                        class="w-full min-h-12 rounded-xl border border-stone-300 bg-white pl-3.5 pr-12 py-2.5 text-lg tracking-widest tabular-nums text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        (click)="showVisitorRegPin.set(!showVisitorRegPin())"
+                        aria-label="Mostrar ou ocultar PIN"
+                        class="absolute right-1 min-w-11 min-h-11 rounded-lg flex items-center justify-center text-ink-600 hover:text-pine-900 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                      >
+                        <app-festive-icon [name]="showVisitorRegPin() ? 'eye-off' : 'eye'" svgClass="w-5 h-5" />
+                      </button>
+                    </div>
                   </div>
 
                   <button
                     type="submit"
                     data-testid="visitor-register-join-btn"
                     [disabled]="isSubmitting()"
-                    class="w-full min-h-12 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-bold text-base shadow-sm transition"
+                    class="w-full min-h-12 rounded-xl bg-pine-800 hover:bg-pine-900 disabled:opacity-60 text-white font-bold text-base shadow-sm transition flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
                   >
-                    Cadastrar e Participar do Grupo
+                    @if (isSubmitting()) {
+                      <app-festive-icon name="spinner" svgClass="w-5 h-5" />
+                      <span>Verificando localização da casa...</span>
+                    } @else {
+                      <span>Cadastrar e Participar do Grupo</span>
+                    }
                   </button>
                 </form>
               } @else {
@@ -206,7 +254,7 @@ import { HomeGroupsPageComponent } from '../home/home-groups-page.component';
                   class="space-y-4"
                 >
                   <div>
-                    <label for="vis-login-username" class="block text-sm font-semibold text-slate-800 mb-1">
+                    <label for="vis-login-username" class="block text-sm font-semibold text-ink-900 mb-1.5">
                       Username
                     </label>
                     <input
@@ -215,41 +263,56 @@ import { HomeGroupsPageComponent } from '../home/home-groups-page.component';
                       formControlName="username"
                       placeholder="Ex: maria.silva"
                       autocapitalize="none"
-                      class="w-full min-h-12 rounded-xl border border-slate-300 px-3.5 py-2.5 text-base lowercase focus:border-emerald-600 focus:outline-none"
+                      class="w-full min-h-12 rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-base lowercase text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
                     />
                   </div>
 
                   <div>
-                    <label for="vis-login-pin" class="block text-sm font-semibold text-slate-800 mb-1">
+                    <label for="vis-login-pin" class="block text-sm font-semibold text-ink-900 mb-1.5">
                       PIN (4 a 6 dígitos)
                     </label>
-                    <input
-                      id="vis-login-pin"
-                      type="password"
-                      inputmode="numeric"
-                      maxlength="6"
-                      formControlName="pin"
-                      placeholder="••••"
-                      class="w-full min-h-12 rounded-xl border border-slate-300 px-3.5 py-2.5 text-lg tracking-widest focus:border-emerald-600 focus:outline-none"
-                    />
+                    <div class="relative flex items-center">
+                      <input
+                        id="vis-login-pin"
+                        [type]="showVisitorLoginPin() ? 'text' : 'password'"
+                        inputmode="numeric"
+                        maxlength="6"
+                        formControlName="pin"
+                        placeholder="••••"
+                        class="w-full min-h-12 rounded-xl border border-stone-300 bg-white pl-3.5 pr-12 py-2.5 text-lg tracking-widest tabular-nums text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        (click)="showVisitorLoginPin.set(!showVisitorLoginPin())"
+                        aria-label="Mostrar ou ocultar PIN"
+                        class="absolute right-1 min-w-11 min-h-11 rounded-lg flex items-center justify-center text-ink-600 hover:text-pine-900 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                      >
+                        <app-festive-icon [name]="showVisitorLoginPin() ? 'eye-off' : 'eye'" svgClass="w-5 h-5" />
+                      </button>
+                    </div>
                   </div>
 
                   <button
                     type="submit"
                     data-testid="visitor-login-join-btn"
                     [disabled]="isSubmitting()"
-                    class="w-full min-h-12 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-bold text-base shadow-sm transition"
+                    class="w-full min-h-12 rounded-xl bg-pine-800 hover:bg-pine-900 disabled:opacity-60 text-white font-bold text-base shadow-sm transition flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
                   >
-                    Entrar e Participar do Grupo
+                    @if (isSubmitting()) {
+                      <app-festive-icon name="spinner" svgClass="w-5 h-5" />
+                      <span>Verificando localização da casa...</span>
+                    } @else {
+                      <span>Entrar e Participar do Grupo</span>
+                    }
                   </button>
                 </form>
               }
             </section>
           } @else {
             <!-- Authenticated user on OPEN group -->
-            <section class="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 space-y-4">
+            <section class="bg-pine-50 border border-pine-200 rounded-3xl p-5 space-y-4">
               @if (!g.joined) {
-                <p class="text-sm text-slate-800">
+                <p class="text-sm text-ink-900">
                   Olá, <strong>{{ authStore.name() }}</strong> (&#64;{{ authStore.username() }}). Toque abaixo para confirmar sua participação neste grupo:
                 </p>
                 <button
@@ -257,16 +320,22 @@ import { HomeGroupsPageComponent } from '../home/home-groups-page.component';
                   data-testid="authenticated-join-btn"
                   [disabled]="isSubmitting()"
                   (click)="joinWithCurrentAuthenticatedUser()"
-                  class="w-full min-h-12 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-bold text-base shadow-sm transition"
+                  class="w-full min-h-12 rounded-xl bg-pine-800 hover:bg-pine-900 disabled:opacity-60 text-white font-bold text-base shadow-sm transition flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
                 >
-                  Participar deste Grupo
+                  @if (isSubmitting()) {
+                    <app-festive-icon name="spinner" svgClass="w-5 h-5" />
+                    <span>Verificando localização da casa...</span>
+                  } @else {
+                    <span>Participar deste Grupo</span>
+                  }
                 </button>
               } @else {
                 <div data-testid="already-joined-confirmation" class="space-y-1">
-                  <p class="text-base font-bold text-emerald-950">
-                    Você já está inscrito neste grupo, {{ authStore.name() }}!
+                  <p class="text-base font-bold text-pine-950 flex items-center gap-1.5">
+                    <app-festive-icon name="check" svgClass="w-5 h-5 text-pine-700 shrink-0" />
+                    <span>Você já está inscrito neste grupo, {{ authStore.name() }}!</span>
                   </p>
-                  <p class="text-xs text-emerald-800">
+                  <p class="text-xs text-pine-800">
                     Aguarde o organizador realizar o sorteio ou cadastre outro familiar (ex: filho/dependente) neste mesmo celular.
                   </p>
                 </div>
@@ -276,9 +345,10 @@ import { HomeGroupsPageComponent } from '../home/home-groups-page.component';
                 type="button"
                 data-testid="public-switch-family-user-btn"
                 (click)="onSwitchFamilyUser()"
-                class="w-full min-h-12 rounded-xl bg-white border border-emerald-400 hover:bg-emerald-100 text-emerald-900 font-semibold text-sm px-3 py-2 shadow-sm transition"
+                class="w-full min-h-12 rounded-xl bg-white border border-pine-700/35 hover:bg-pine-100/70 text-pine-900 font-semibold text-sm px-3.5 py-2.5 flex items-center justify-center gap-2 shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
               >
-                Cadastrar outro familiar / Trocar de usuário neste aparelho
+                <app-festive-icon name="switch-user" svgClass="w-4 h-4 shrink-0" />
+                <span>Cadastrar outro familiar / Trocar de usuário neste aparelho</span>
               </button>
             </section>
           }
@@ -286,13 +356,26 @@ import { HomeGroupsPageComponent } from '../home/home-groups-page.component';
           <!-- DRAWN STATE: Reveal Secret Friend with username + PIN -->
           <section
             data-testid="reveal-form-section"
-            class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4"
+            class="bg-festive-card border border-festive-border rounded-3xl p-5 shadow-sm space-y-4"
           >
-            <div class="space-y-1">
-              <h2 class="text-lg font-bold text-slate-900">Consultar Quem Eu Tirei</h2>
-              <p class="text-xs text-slate-600">
-                Toque no seu nome na lista abaixo ou digite seu username e seu PIN numérico de 4 a 6 dígitos para revelar seu Amigo Secreto.
-              </p>
+            <div class="space-y-2">
+              <div class="flex items-center gap-2">
+                <app-festive-icon name="gift-open" svgClass="w-5 h-5 text-cranberry-700" />
+                <h2 class="font-display text-lg font-bold text-ink-900">Consultar Quem Eu Tirei</h2>
+              </div>
+
+              <!-- 3-step visual guide -->
+              <div class="grid grid-cols-3 gap-1.5 text-center text-[11px] font-semibold">
+                <div class="rounded-xl bg-festive-cream border border-festive-border p-2 text-ink-900">
+                  1. Toque no seu nome
+                </div>
+                <div class="rounded-xl bg-festive-cream border border-festive-border p-2 text-ink-900">
+                  2. Digite seu PIN
+                </div>
+                <div class="rounded-xl bg-cranberry-50 border border-cranberry-200 p-2 text-cranberry-800">
+                  3. Abra seu presente
+                </div>
+              </div>
             </div>
 
             <form
@@ -302,7 +385,7 @@ import { HomeGroupsPageComponent } from '../home/home-groups-page.component';
               class="space-y-4"
             >
               <div>
-                <label for="reveal-username" class="block text-sm font-semibold text-slate-800 mb-1">
+                <label for="reveal-username" class="block text-sm font-semibold text-ink-900 mb-1.5">
                   Seu Username
                 </label>
                 <input
@@ -311,32 +394,48 @@ import { HomeGroupsPageComponent } from '../home/home-groups-page.component';
                   formControlName="username"
                   placeholder="Ex: maria.silva"
                   autocapitalize="none"
-                  class="w-full min-h-12 rounded-xl border border-slate-300 px-3.5 py-2.5 text-base lowercase focus:border-emerald-600 focus:outline-none"
+                  class="w-full min-h-12 rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-base lowercase text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
                 />
               </div>
 
               <div>
-                <label for="reveal-pin" class="block text-sm font-semibold text-slate-800 mb-1">
+                <label for="reveal-pin" class="block text-sm font-semibold text-ink-900 mb-1.5">
                   Seu PIN (4 a 6 dígitos)
                 </label>
-                <input
-                  id="reveal-pin"
-                  type="password"
-                  inputmode="numeric"
-                  maxlength="6"
-                  formControlName="pin"
-                  placeholder="••••"
-                  class="w-full min-h-12 rounded-xl border border-slate-300 px-3.5 py-2.5 text-lg tracking-widest focus:border-emerald-600 focus:outline-none"
-                />
+                <div class="relative flex items-center">
+                  <input
+                    id="reveal-pin"
+                    [type]="showRevealPin() ? 'text' : 'password'"
+                    inputmode="numeric"
+                    maxlength="6"
+                    formControlName="pin"
+                    placeholder="••••"
+                    class="w-full min-h-12 rounded-xl border border-stone-300 bg-white pl-3.5 pr-12 py-2.5 text-lg tracking-widest tabular-nums text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    (click)="showRevealPin.set(!showRevealPin())"
+                    aria-label="Mostrar ou ocultar PIN"
+                    class="absolute right-1 min-w-11 min-h-11 rounded-lg flex items-center justify-center text-ink-600 hover:text-pine-900 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                  >
+                    <app-festive-icon [name]="showRevealPin() ? 'eye-off' : 'eye'" svgClass="w-5 h-5" />
+                  </button>
+                </div>
               </div>
 
               <button
                 type="submit"
                 data-testid="reveal-submit-btn"
                 [disabled]="isSubmitting()"
-                class="w-full min-h-12 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-bold text-base shadow-sm transition"
+                class="w-full min-h-12 rounded-xl bg-cranberry-700 hover:bg-cranberry-800 disabled:opacity-60 text-white font-bold text-base shadow-sm transition flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
               >
-                Revelar Meu Amigo Secreto
+                @if (isSubmitting()) {
+                  <app-festive-icon name="spinner" svgClass="w-5 h-5" />
+                  <span>Abrindo presente...</span>
+                } @else {
+                  <app-festive-icon name="gift-open" svgClass="w-5 h-5" />
+                  <span>Abrir Meu Presente</span>
+                }
               </button>
             </form>
           </section>
@@ -344,38 +443,90 @@ import { HomeGroupsPageComponent } from '../home/home-groups-page.component';
 
         <!-- Participant List -->
         <section class="space-y-3" data-testid="public-participants-list">
-          <h2 class="text-lg font-bold text-slate-900">
+          <h2 class="font-display text-lg font-bold text-ink-900">
             Participantes do Grupo ({{ g.participants.length }})
           </h2>
 
           @if (g.participants.length === 0) {
-            <p class="text-sm text-slate-500 bg-slate-50 border border-slate-200 rounded-xl p-4">
+            <p class="text-sm text-ink-600 bg-white border border-festive-border rounded-2xl p-4">
               Seja o primeiro a participar deste grupo!
             </p>
           } @else {
-            <div class="space-y-2">
+            <div class="space-y-2.5">
               @for (p of g.participants; track p.id) {
-                <button
-                  type="button"
-                  data-testid="participant-list-item"
-                  (click)="onSelectParticipantFromList(p)"
-                  class="w-full text-left bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl p-3.5 shadow-sm flex items-center justify-between gap-2 transition"
-                >
-                  <div>
-                    <p class="font-bold text-slate-900 text-sm">{{ p.name }}</p>
-                    <p class="text-xs text-slate-600">&#64;{{ p.username }}</p>
+                @if (g.status === 'OPEN') {
+                  <!-- Non-interactive informational card when OPEN -->
+                  <div
+                    data-testid="participant-list-item"
+                    [attr.data-reveal-status]="p.revealStatus"
+                    class="w-full bg-festive-card border border-festive-border rounded-2xl p-3.5 shadow-sm flex items-center justify-between gap-2.5"
+                  >
+                    <div class="flex items-center gap-3 min-w-0">
+                      <div
+                        [class]="
+                          'w-10 h-10 rounded-xl border font-display font-bold text-xs flex items-center justify-center shrink-0 ' +
+                          avatarTone(p.name)
+                        "
+                      >
+                        {{ initials(p.name) }}
+                      </div>
+                      <div class="min-w-0">
+                        <p class="font-bold text-ink-900 text-sm truncate">{{ p.name }}</p>
+                        <p class="text-xs text-ink-600 truncate">&#64;{{ p.username }}</p>
+                      </div>
+                    </div>
+                    <span
+                      data-testid="public-participant-status"
+                      [attr.data-reveal-status]="p.revealStatus"
+                      class="px-2.5 py-1 rounded-full bg-pine-50 border border-pine-200 text-pine-800 text-xs font-semibold shrink-0"
+                    >
+                      Confirmado
+                    </span>
                   </div>
-                  <span
-                    data-testid="public-participant-status"
+                } @else {
+                  <!-- Interactive button to select participant when DRAWN -->
+                  <button
+                    type="button"
+                    data-testid="participant-list-item"
+                    [attr.data-reveal-status]="p.revealStatus"
+                    (click)="onSelectParticipantFromList(p)"
                     [class]="
-                      p.revealStatus === 'REVEALED'
-                        ? 'px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold'
-                        : 'px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium'
+                      revealForm.controls.username.value === p.username
+                        ? 'w-full min-h-[56px] text-left bg-gold-50/70 border-2 border-pine-800 rounded-2xl p-3.5 shadow-sm flex items-center justify-between gap-2.5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500'
+                        : 'w-full min-h-[56px] text-left bg-festive-card hover:bg-festive-cream border border-festive-border rounded-2xl p-3.5 shadow-sm flex items-center justify-between gap-2.5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500'
                     "
                   >
-                    {{ formatParticipantRevealStatus(p) }}
-                  </span>
-                </button>
+                    <div class="flex items-center gap-3 min-w-0">
+                      <div
+                        [class]="
+                          'w-10 h-10 rounded-xl border font-display font-bold text-xs flex items-center justify-center shrink-0 ' +
+                          avatarTone(p.name)
+                        "
+                      >
+                        {{ initials(p.name) }}
+                      </div>
+                      <div class="min-w-0">
+                        <p class="font-bold text-ink-900 text-sm truncate">{{ p.name }}</p>
+                        <p class="text-xs text-ink-600 truncate">&#64;{{ p.username }}</p>
+                      </div>
+                    </div>
+                    <span
+                      data-testid="public-participant-status"
+                      [attr.data-reveal-status]="p.revealStatus"
+                      [class]="
+                        p.revealStatus === 'REVEALED'
+                          ? 'inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-pine-100 text-pine-900 text-xs font-semibold shrink-0'
+                          : 'inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gold-50 border border-gold-200 text-gold-900 text-xs font-medium shrink-0'
+                      "
+                    >
+                      <app-festive-icon
+                        [name]="p.revealStatus === 'REVEALED' ? 'gift-open' : 'gift'"
+                        svgClass="w-3.5 h-3.5"
+                      />
+                      <span>{{ formatParticipantRevealStatus(p) }}</span>
+                    </span>
+                  </button>
+                }
               }
             </div>
           }
@@ -400,7 +551,11 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
 
   readonly group = signal<PublicGroupView | null>(null);
   readonly visitorMode = signal<'register' | 'login'>('register');
+  readonly showVisitorRegPin = signal<boolean>(false);
+  readonly showVisitorLoginPin = signal<boolean>(false);
+  readonly showRevealPin = signal<boolean>(false);
   readonly isSubmitting = signal<boolean>(false);
+  readonly capturingGeo = signal<boolean>(false);
   readonly errorMessage = signal<string | null>(null);
   readonly statusMessage = signal<string | null>(null);
   readonly geoFallbackNotice = signal<boolean>(false);
@@ -442,6 +597,25 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
     this.revealedFriendName.set(null);
     this.revealedByUsername.set(null);
     this.revealForm.controls.pin.setValue('');
+  }
+
+  participantCountLabel(count: number): string {
+    return formatParticipantCount(count);
+  }
+
+  missingParticipantsLabel(count: number): string {
+    const missing = Math.max(0, 3 - count);
+    return missing === 1
+      ? 'Falta 1 pessoa para o sorteio'
+      : `Faltam ${missing} pessoas para o sorteio`;
+  }
+
+  initials(name: string): string {
+    return getInitials(name);
+  }
+
+  avatarTone(name: string): string {
+    return getAvatarTone(name);
   }
 
   loadPublicGroup(): void {
@@ -493,7 +667,9 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
     }
 
     this.isSubmitting.set(true);
+    this.capturingGeo.set(true);
     const geo = await this.geoService.captureCoordinatesForJoin();
+    this.capturingGeo.set(false);
     if (geo.fallbackUsed) {
       this.geoFallbackNotice.set(true);
     }
@@ -516,6 +692,7 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
       .subscribe({
         next: () => {
           this.isSubmitting.set(false);
+          this.showVisitorRegPin.set(false);
           this.visitorRegisterForm.reset();
           this.visitorUsernameManuallyEdited = false;
           this.statusMessage.set('Cadastro e inscrição no grupo realizados com sucesso!');
@@ -546,7 +723,9 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
     }
 
     this.isSubmitting.set(true);
+    this.capturingGeo.set(true);
     const geo = await this.geoService.captureCoordinatesForJoin();
+    this.capturingGeo.set(false);
     if (geo.fallbackUsed) {
       this.geoFallbackNotice.set(true);
     }
@@ -568,6 +747,7 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
       .subscribe({
         next: () => {
           this.isSubmitting.set(false);
+          this.showVisitorLoginPin.set(false);
           this.visitorLoginForm.reset();
           this.statusMessage.set('Login e inscrição no grupo realizados com sucesso!');
           this.loadPublicGroup();
@@ -590,8 +770,10 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
     this.errorMessage.set(null);
     this.statusMessage.set(null);
     this.isSubmitting.set(true);
+    this.capturingGeo.set(true);
 
     const geo = await this.geoService.captureCoordinatesForJoin();
+    this.capturingGeo.set(false);
     if (geo.fallbackUsed) {
       this.geoFallbackNotice.set(true);
     }
@@ -619,6 +801,8 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
     this.errorMessage.set(null);
     this.statusMessage.set(null);
     this.geoFallbackNotice.set(false);
+    this.showVisitorRegPin.set(false);
+    this.showVisitorLoginPin.set(false);
     this.visitorRegisterForm.reset();
     this.visitorLoginForm.reset();
     this.visitorUsernameManuallyEdited = false;
@@ -651,6 +835,7 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (result) => {
           this.isSubmitting.set(false);
+          this.showRevealPin.set(false);
           this.revealForm.controls.pin.setValue('');
           this.revealedByUsername.set(result.username);
           this.revealedFriendName.set(result.drawnParticipantName);
@@ -679,11 +864,11 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
   formatParticipantRevealStatus(participant: PublicParticipantView): string {
     switch (participant.revealStatus) {
       case 'REVEALED':
-        return 'REVEALED (Já viu)';
+        return 'Já descobriu';
       case 'PENDING_REVEAL':
-        return 'PENDING_REVEAL (Falta ver)';
+        return 'Ainda não espiou';
       default:
-        return 'Inscrito';
+        return 'Confirmado';
     }
   }
 }

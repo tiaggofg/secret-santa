@@ -95,7 +95,7 @@ describe('AdminDashboardPageComponent', () => {
     fixture.detectChanges();
   });
 
-  it('renders group status, participants with @username, GPS status and reveal status without exposing drawn pairs', () => {
+  it('renders group status, participants with @username, GPS status and human reveal status without exposing drawn pairs or technical enums', () => {
     const text = fixture.nativeElement.textContent;
     expect(text).toContain('Natal Família Silva');
     expect(text).toContain('@tiago.silva');
@@ -103,8 +103,17 @@ describe('AdminDashboardPageComponent', () => {
     expect(text).toContain('@lucas.silva');
     expect(text).toContain('GPS Ativo (50m)');
     expect(text).toContain('Sem GPS');
+    expect(text).toContain('Inscrições Abertas');
+    expect(text).toContain('Aguardando sorteio');
+    expect(text).not.toContain('WAITING_DRAW');
+    expect(text).not.toContain('PENDING_REVEAL');
     expect(text).not.toContain('drawnParticipantId');
     expect(text).not.toContain('pinHash');
+
+    const statusBadge = fixture.nativeElement.querySelector('[data-testid="group-status-badge"]');
+    expect(statusBadge?.getAttribute('data-group-status')).toBe('OPEN');
+    const revealBadge = fixture.nativeElement.querySelector('[data-testid="participant-reveal-badge"]');
+    expect(revealBadge?.getAttribute('data-reveal-status')).toBe('WAITING_DRAW');
   });
 
   it('shares the group WhatsApp link (/g/{slug}) via ShareLinkService', async () => {
@@ -171,7 +180,7 @@ describe('AdminDashboardPageComponent', () => {
     expect(apiMock.getAdminGroup).toHaveBeenCalledTimes(2);
   });
 
-  it('executes the draw when >= 3 participants are registered and updates status to DRAWN', () => {
+  it('executes the draw after inline confirmation when >= 3 participants are registered and updates status to DRAWN', () => {
     const drawnGroup: AdminGroupView = {
       ...sampleOpenGroup,
       status: 'DRAWN',
@@ -189,6 +198,15 @@ describe('AdminDashboardPageComponent', () => {
     );
     expect(drawBtn.disabled).toBe(false);
     drawBtn.click();
+    fixture.detectChanges();
+
+    expect(apiMock.executeDraw).not.toHaveBeenCalled();
+
+    const confirmBtn: HTMLButtonElement = fixture.nativeElement.querySelector(
+      '[data-testid="confirm-draw-btn"]'
+    );
+    expect(confirmBtn).not.toBeNull();
+    confirmBtn.click();
     fixture.detectChanges();
 
     expect(apiMock.executeDraw).toHaveBeenCalledWith('natal-familia-a1b2');

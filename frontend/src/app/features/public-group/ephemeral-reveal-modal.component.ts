@@ -7,10 +7,12 @@ import {
   Output,
   signal
 } from '@angular/core';
+import { FestiveIconComponent } from '../../shared/components/festive-icon.component';
 
 @Component({
   selector: 'app-ephemeral-reveal-modal',
   standalone: true,
+  imports: [FestiveIconComponent],
   template: `
     @if (drawnName(); as secretFriend) {
       <div
@@ -18,43 +20,56 @@ import {
         aria-modal="true"
         aria-labelledby="reveal-modal-title"
         data-testid="ephemeral-reveal-backdrop"
-        class="fixed inset-0 z-50 bg-slate-950/90 flex items-center justify-center p-4"
+        class="fixed inset-0 z-50 bg-pine-950/95 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
       >
         <div
           data-testid="ephemeral-reveal-card"
-          class="w-full max-w-sm bg-white border-4 border-emerald-600 rounded-3xl p-6 shadow-2xl text-center space-y-5"
+          class="w-full max-w-sm bg-festive-cream border-2 border-gold-500 rounded-3xl overflow-hidden shadow-2xl text-center animate-fade-slide-up"
         >
-          <div class="space-y-1">
+          <!-- Cranberry & Gold Gift Ribbon Header -->
+          <div class="bg-gradient-to-r from-cranberry-800 via-cranberry-700 to-cranberry-800 px-5 py-4 text-white relative border-b-2 border-gold-400">
+            <div class="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-white/15 border border-gold-400/70 mb-2 shadow-inner">
+              <app-festive-icon name="gift-open" svgClass="w-6 h-6 text-amber-200" />
+            </div>
             <p
               id="reveal-modal-title"
-              class="text-xs font-extrabold uppercase tracking-widest text-emerald-800"
+              class="text-xs font-extrabold uppercase tracking-widest text-amber-100"
             >
               Seu Amigo Secreto é
             </p>
             @if (participantUsername()) {
-              <p class="text-xs text-slate-500">Consulta exclusiva de &#64;{{ participantUsername() }}</p>
+              <p class="text-xs text-amber-200/90 mt-0.5">
+                Consulta exclusiva de &#64;{{ participantUsername() }}
+              </p>
             }
           </div>
 
-          <div
-            data-testid="drawn-participant-name"
-            class="py-6 px-4 rounded-2xl bg-emerald-950 text-white font-black text-3xl tracking-tight break-words shadow-inner"
-          >
-            {{ secretFriend }}
+          <div class="p-6 space-y-5">
+            <!-- High-contrast name box (>= 7:1 contrast) -->
+            <div
+              data-testid="drawn-participant-name"
+              class="py-7 px-4 rounded-2xl bg-pine-900 border-2 border-gold-500 text-white font-display font-bold text-3xl sm:text-4xl tracking-tight break-words shadow-inner"
+            >
+              {{ secretFriend }}
+            </div>
+
+            <!-- Pass the phone privacy shield notice -->
+            <div class="flex items-start gap-2.5 text-left rounded-xl bg-gold-50 border border-gold-200 p-3 text-xs text-ink-900 leading-relaxed">
+              <app-festive-icon name="shield-eye" svgClass="w-5 h-5 text-gold-600 shrink-0 mt-0.5" />
+              <p>
+                <strong>Modo Passar o Celular:</strong> memorize o nome acima. Ao tocar no botão abaixo ou bloquear a tela, este segredo é apagado imediatamente.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              data-testid="close-and-pass-phone-btn"
+              (click)="wipeAndClose()"
+              class="w-full min-h-[52px] rounded-2xl bg-pine-800 hover:bg-pine-900 active:bg-pine-950 text-white font-extrabold text-base px-4 py-3.5 shadow-md transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+            >
+              Fechar e passar o celular
+            </button>
           </div>
-
-          <p class="text-xs text-slate-600 leading-relaxed">
-            Memorize o nome acima! Ao tocar no botão abaixo ou bloquear a tela, este resultado será apagado imediatamente da memória do celular.
-          </p>
-
-          <button
-            type="button"
-            data-testid="close-and-pass-phone-btn"
-            (click)="wipeAndClose()"
-            class="w-full min-h-12 rounded-2xl bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white font-extrabold text-base px-4 py-3.5 shadow-md transition"
-          >
-            Fechar e passar o celular
-          </button>
         </div>
       </div>
     }
@@ -67,6 +82,7 @@ export class EphemeralRevealModalComponent implements OnDestroy {
   @Input()
   set drawnParticipantName(value: string | null) {
     this.drawnName.set(value);
+    this.syncBodyScrollLock(value !== null);
   }
 
   @Input()
@@ -87,12 +103,14 @@ export class EphemeralRevealModalComponent implements OnDestroy {
   open(name: string, username?: string): void {
     this.drawnName.set(name);
     this.participantUsername.set(username ?? null);
+    this.syncBodyScrollLock(true);
   }
 
   wipeAndClose(): void {
     const hadValue = this.drawnName() !== null;
     this.drawnName.set(null);
     this.participantUsername.set(null);
+    this.syncBodyScrollLock(false);
     if (hadValue) {
       this.closed.emit();
     }
@@ -101,5 +119,12 @@ export class EphemeralRevealModalComponent implements OnDestroy {
   ngOnDestroy(): void {
     this.drawnName.set(null);
     this.participantUsername.set(null);
+    this.syncBodyScrollLock(false);
+  }
+
+  private syncBodyScrollLock(locked: boolean): void {
+    if (typeof document !== 'undefined' && document.body) {
+      document.body.style.overflow = locked ? 'hidden' : '';
+    }
   }
 }

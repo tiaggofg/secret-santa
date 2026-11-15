@@ -42,13 +42,21 @@
 - **Date**: 2026-11-13
 - **Status**: active
 
+### AD-006
+- **Decision**: Renomear a aplicação para **"Amigo Secreto"**, restringir a Home (`/`) a exibir exclusivamente **"Meus Grupos"** (removendo `"Grupos Disponíveis (Abertos)"`), mover a criação de novos grupos para um **modal** acionado por botão (`+ Criar Grupo`) e tornar o botão de troca de usuário/saída (`Trocar / Sair`) discreto na barra de identidade.
+- **Reason**: Prepara o fluxo de grupos privados acessíveis por link/senha onde o usuário visualiza apenas os grupos de que participa ou que organiza, reduz o ruído visual na Home mobile e mantém a troca de familiar acessível sem competir com a ação principal.
+- **Trade-off**: Usuários não descobrem grupos abertos pela Home; o ingresso em novos grupos passa a ocorrer exclusivamente pelo link compartilhado (`/g/{slug}`).
+- **Scope**: Frontend Angular (`index.html`, `AppComponent`, `HomeGroupsPageComponent`, `AdminDashboardPageComponent`) e spec `festive-ui-ux`.
+- **Date**: 2026-11-15
+- **Status**: active
+
 ## Handoff
 
-- **Feature**: secret-santa (`.specs/features/secret-santa`)
-- **Phase / Task**: Done — todas as 17 tarefas (`T1`..`T17`), `proofs.md` (`39 pass, 0 fail`) e `verification.md` (`PASS`) concluídos
-- **Completed**: `T1`..`T17`, `proofs.md`, `verification.md`
+- **Feature**: festive-ui-ux (`.specs/features/festive-ui-ux`)
+- **Phase / Task**: Done — redesign natalino + ajustes da Home (`F1`..`F8`) concluídos e validados via Vitest (`37 pass`), `ng build` e Playwright E2E
+- **Completed**: `F1`..`F8`, `.specs/features/festive-ui-ux/spec.md`, `.specs/features/festive-ui-ux/tasks.md`
 - **In-progress** (file:line): none
-- **Next step**: Pronto para uso local ou início de novas features pós-MVP em `.specs/features/<nova-feature>/`
+- **Next step**: Pronto para commit ou evolução futura de grupos privados com senha
 - **Blockers**: none
-- **Uncommitted files**: none
+- **Uncommitted files**: alterações do redesign `festive-ui-ux` e specs no working tree
 - **Branch**: main

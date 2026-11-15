@@ -1,3 +1,77 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (min-width: 768px) {
+  .festive-desktop-backdrop {
+    background-color: #0B2E23;
+    background-image:
+      radial-gradient(circle at 18% 12%, rgba(245, 158, 11, 0.14) 0%, transparent 42%),
+      radial-gradient(circle at 84% 20%, rgba(185, 28, 28, 0.12) 0%, transparent 38%),
+      radial-gradient(circle at 50% 85%, rgba(16, 185, 129, 0.1) 0%, transparent 48%),
+      radial-gradient(rgba(255, 255, 255, 0.16) 1px, transparent 1px),
+      radial-gradient(rgba(253, 230, 138, 0.14) 1px, transparent 1px);
+    background-size:
+      100% 100%,
+      100% 100%,
+      100% 100%,
+      48px 48px,
+      72px 72px;
+    background-position:
+      0 0,
+      0 0,
+      0 0,
+      0 0,
+      24px 36px;
+  }
+}
+
+.festive-garland {
+  height: 6px;
+  background-image: repeating-linear-gradient(
+    90deg,
+    #B45309 0px,
+    #B45309 10px,
+    #B91C1C 10px,
+    #B91C1C 20px,
+    #0F4C3A 20px,
+    #0F4C3A 30px
+  );
+  opacity: 0.9;
+}
+
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-slide-up {
+  animation: fadeSlideUp 200ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-slide-up,
+  .animate-spin {
+    animation: none !important;
+  }
+
+  * {
+    transition-duration: 0.01ms !important;
+  }
+}
