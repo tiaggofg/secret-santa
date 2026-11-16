@@ -32,12 +32,12 @@ jobs:
 
       - name: Trigger Git Stack Redeploy on Portainer CE via REST API
         env:
-          PORTAINER_URL: ${{ secrets.PORTAINER_URL }}
-          PORTAINER_API_KEY: ${{ secrets.PORTAINER_API_KEY }}
-          PORTAINER_STACK_ID: ${{ secrets.PORTAINER_STACK_ID }}
-          PORTAINER_ENDPOINT_ID: ${{ secrets.PORTAINER_ENDPOINT_ID }}
-          PORTAINER_GIT_USERNAME: ${{ secrets.PORTAINER_GIT_USERNAME }}
-          PORTAINER_GIT_PASSWORD: ${{ secrets.PORTAINER_GIT_PASSWORD }}
+          PORTAINER_URL: ${{ secrets.PORTAINER_URL || vars.PORTAINER_URL }}
+          PORTAINER_API_KEY: ${{ secrets.PORTAINER_API_KEY || vars.PORTAINER_API_KEY }}
+          PORTAINER_STACK_ID: ${{ secrets.PORTAINER_STACK_ID || vars.PORTAINER_STACK_ID }}
+          PORTAINER_ENDPOINT_ID: ${{ secrets.PORTAINER_ENDPOINT_ID || vars.PORTAINER_ENDPOINT_ID }}
+          PORTAINER_GIT_USERNAME: ${{ secrets.PORTAINER_GIT_USERNAME || vars.PORTAINER_GIT_USERNAME }}
+          PORTAINER_GIT_PASSWORD: ${{ secrets.PORTAINER_GIT_PASSWORD || vars.PORTAINER_GIT_PASSWORD }}
         run: |
           set -euo pipefail
 
