@@ -123,6 +123,19 @@ Após concluir qualquer implementação ou correção no projeto, além de garan
 
 Ao finalizar qualquer ciclo completo de implementação e verificação:
 
-1. **Solicitação de Aprovação**: Você **DEVE** perguntar explicitamente ao usuário se as alterações estão aprovadas.
-2. **Commit e Push após Aprovação**: Caso o usuário confirme a aprovação, você **DEVE** realizar o `git add`, `git commit` (com mensagem descritiva seguindo Conventional Commits) e `git push` para o repositório remoto.
-3. **Sem Push Antes da Aprovação**: Nunca execute `git commit` ou `git push` antes de receber a aprovação explícita do usuário para o ciclo concluído.
+1. **Atualização da Documentação**: Antes de solicitar aprovação ou realizar o `git push`, garanta que a regra da **Seção 8** foi cumprida (`README.md` e `docs/` atualizados).
+2. **Solicitação de Aprovação**: Você **DEVE** perguntar explicitamente ao usuário se as alterações estão aprovadas.
+3. **Commit e Push após Aprovação**: Caso o usuário confirme a aprovação, você **DEVE** realizar o `git add`, `git commit` (com mensagem descritiva seguindo Conventional Commits) e `git push` para o repositório remoto.
+4. **Sem Push Antes da Aprovação**: Nunca execute `git commit` ou `git push` antes de receber a aprovação explícita do usuário para o ciclo concluído.
+
+---
+
+## 8. Regra Obrigatória de Atualização da Documentação Pós-Ciclo
+
+Ao final de **cada ciclo de implementação, refatoração ou alteração de infraestrutura/CI/CD**, e **sempre antes de realizar o `git push`**, você **DEVE** revisar e atualizar o [README.md](README.md) e os arquivos da pasta [docs/](docs/README.md) para manter a documentação 100% sincronizada com o código:
+
+1. **Arquitetura e Diagramas (`docs/arquitetura-c4.md`, `docs/modelo-dominio-e-dados.md`)**: Atualize diagramas C4, classes de domínio, entidades/documentos MongoDB, índices e máquinas de estado sempre que houver novos componentes, agregados, campos ou coleções.
+2. **Fluxos e Sequências (`docs/fluxos-e-sequencias.md`, `docs/algoritmo-sorteio.md`)**: Atualize fluxogramas de navegação, diagramas de sequência e regras do algoritmo de sorteio caso fluxos de UI ou regras de negócio mudem.
+3. **API e Segurança (`docs/api-rest.md`, `docs/seguranca-e-privacidade.md`)**: Atualize contratos REST (`/api/v1`), DTOs, códigos HTTP e mecanismos de autenticação/sigilo sempre que endpoints ou políticas mudarem.
+4. **Deploy e Setup (`README.md`, `docs/deploy-e-ci-cd.md`)**: Atualize instruções de execução local, variáveis de ambiente, Dockerfile, Docker Compose ou workflows de CI/CD quando alterados.
+5. **Inclusão no Commit do Ciclo**: Todas as atualizações em `README.md` e `docs/` devem ser incluídas antes do `git push` final do ciclo.
