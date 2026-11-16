@@ -9,11 +9,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.secretsanta.application.SecretSantaApplicationService;
 import com.secretsanta.application.SecretSantaApplicationService.AdminGroupView;
+import com.secretsanta.application.SecretSantaApplicationService.AuthSessionView;
 import com.secretsanta.config.MongoTestContainerConfig;
 import com.secretsanta.domain.model.Username;
 import com.secretsanta.domain.port.UserAccountRepository;
 import com.secretsanta.infrastructure.persistence.SecretSantaGroupDocument;
 import com.secretsanta.infrastructure.persistence.SecretSantaIndexesChangeUnit;
+import com.secretsanta.infrastructure.persistence.RefreshTokenDocument;
 import com.secretsanta.infrastructure.persistence.UserAccountDocument;
 import java.util.HashMap;
 import java.util.Map;
@@ -23,7 +25,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.http.HttpHeaders;
+import jakarta.servlet.http.Cookie;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
@@ -55,8 +57,13 @@ class GroupPublicControllerIT {
     @BeforeEach
     void setUp() {
         mongoTemplate.dropCollection(UserAccountDocument.class);
+        mongoTemplate.dropCollection(RefreshTokenDocument.class);
         mongoTemplate.dropCollection(SecretSantaGroupDocument.class);
         indexesChangeUnit.ensureIndexes();
+    }
+
+    private static Cookie accessCookie(AuthSessionView session) {
+        return new Cookie(AuthCookieManager.ACCESS_TOKEN_COOKIE, session.token());
     }
 
     private static String extractSig(AdminGroupView group) {
@@ -68,8 +75,8 @@ class GroupPublicControllerIT {
 
     @Test
     void shouldListOnlyMyGroupsForAuthenticatedUser() throws Exception {
-        var userA = applicationService.registerUser("User A", "user.a", "1234");
-        var userB = applicationService.registerUser("User B", "user.b", "1234");
+        var userA = applicationService.registerUser("User A", "user.a", "Ab1!cd");
+        var userB = applicationService.registerUser("User B", "user.b", "Ab1!cd");
 
         var myGroup = applicationService.createGroup(userA.userId(), "Grupo do User A");
         applicationService.registerParticipant(myGroup.id(), userA.userId(), null, -23.42, -51.93);
@@ -77,7 +84,7 @@ class GroupPublicControllerIT {
         applicationService.createGroup(userB.userId(), "Grupo Privado B");
 
         mockMvc.perform(get("/api/v1/groups")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + userA.token()))
+                        .cookie(accessCookie(userA)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.myGroups.length()").value(1))
                 .andExpect(jsonPath("$.myGroups[0].id").value(myGroup.id().toString()))
@@ -89,9 +96,9 @@ class GroupPublicControllerIT {
 
     @Test
     void shouldHideParticipantsForNonMembersValidateInviteSignatureAndReturn404ForInvalidUuid() throws Exception {
-        var org = applicationService.registerUser("Org", "org.pub", "1234");
-        var member = applicationService.registerUser("Membro", "membro.pub", "2222");
-        var outsider = applicationService.registerUser("Visitante", "outsider.pub", "3333");
+        var org = applicationService.registerUser("Org", "org.pub", "Ab1!cd");
+        var member = applicationService.registerUser("Membro", "membro.pub", "Bb2@cc");
+        var outsider = applicationService.registerUser("Visitante", "outsider.pub", "Cc3#dd");
 
         var group = applicationService.createGroup(org.userId(), "Natal Privado");
         String sig = extractSig(group);
@@ -117,7 +124,7 @@ class GroupPublicControllerIT {
 
         // Authenticated non-member without sig -> inviteValid: false, participantsVisible: false
         mockMvc.perform(get("/api/v1/groups/{groupId}", group.id())
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + outsider.token()))
+                        .cookie(accessCookie(outsider)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.inviteValid").value(false))
                 .andExpect(jsonPath("$.participantsVisible").value(false))
@@ -125,7 +132,7 @@ class GroupPublicControllerIT {
 
         // Member without sig -> inviteValid: true, participantsVisible: true with full participants list
         MvcResult res = mockMvc.perform(get("/api/v1/groups/{groupId}", group.id())
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + member.token()))
+                        .cookie(accessCookie(member)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(group.id().toString()))
                 .andExpect(jsonPath("$.eventName").value("Natal Privado"))
@@ -148,14 +155,14 @@ class GroupPublicControllerIT {
 
     @Test
     void shouldJoinOpenGroupWithValidInviteSignatureAndRejectInvalidSignatureWith403() throws Exception {
-        var org = applicationService.registerUser("Org", "org.join", "1234");
-        var participant = applicationService.registerUser("Pedro", "pedro.silva", "4567");
+        var org = applicationService.registerUser("Org", "org.join", "Ab1!cd");
+        var participant = applicationService.registerUser("Pedro", "pedro.silva", "Dd4$ee");
         var group = applicationService.createGroup(org.userId(), "Natal GPS");
         String sig = extractSig(group);
 
         // Wrong or missing inviteSignature -> 403 INVALID_INVITE_SIGNATURE
         mockMvc.perform(post("/api/v1/groups/{groupId}/participants", group.id())
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + participant.token())
+                        .cookie(accessCookie(participant))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "inviteSignature", "invalid-sig-0000",
@@ -166,7 +173,7 @@ class GroupPublicControllerIT {
 
         // Correct inviteSignature -> 201 Created
         mockMvc.perform(post("/api/v1/groups/{groupId}/participants", group.id())
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + participant.token())
+                        .cookie(accessCookie(participant))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "inviteSignature", sig,
@@ -181,7 +188,7 @@ class GroupPublicControllerIT {
 
         // Organizer joins own group without inviteSignature -> 201 Created
         mockMvc.perform(post("/api/v1/groups/{groupId}/participants", group.id())
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + org.token())
+                        .cookie(accessCookie(org))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isCreated())
@@ -190,8 +197,8 @@ class GroupPublicControllerIT {
 
     @Test
     void shouldJoinOpenGroupWithNullGeolocationFallbackAndReturn201() throws Exception {
-        var org = applicationService.registerUser("Org", "org.nogps", "1234");
-        var participant = applicationService.registerUser("Julia", "julia.silva", "4567");
+        var org = applicationService.registerUser("Org", "org.nogps", "Ab1!cd");
+        var participant = applicationService.registerUser("Julia", "julia.silva", "Dd4$ee");
         var group = applicationService.createGroup(org.userId(), "Natal Sem GPS");
         String sig = extractSig(group);
 
@@ -201,7 +208,7 @@ class GroupPublicControllerIT {
         body.put("longitude", null);
 
         mockMvc.perform(post("/api/v1/groups/{groupId}/participants", group.id())
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + participant.token())
+                        .cookie(accessCookie(participant))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isCreated())
@@ -211,7 +218,7 @@ class GroupPublicControllerIT {
 
     @Test
     void shouldSupportDirectUnauthenticatedVisitorRegistrationAndAvoidOrphanOnInvalidSignature() throws Exception {
-        var org = applicationService.registerUser("Org", "org.whats", "1234");
+        var org = applicationService.registerUser("Org", "org.whats", "Ab1!cd");
         var group = applicationService.createGroup(org.userId(), "Natal Link Direto");
         String sig = extractSig(group);
 
@@ -221,20 +228,20 @@ class GroupPublicControllerIT {
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "name", "Orphan User",
                                 "username", "orphan.it",
-                                "pin", "1945",
+                                "pin", "Ee5%ff",
                                 "inviteSignature", "wrong-signature"))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode").value("INVALID_INVITE_SIGNATURE"));
 
         assertThat(userAccountRepository.findByUsername(new Username("orphan.it"))).isEmpty();
 
-        // Valid inviteSignature -> 201
-        mockMvc.perform(post("/api/v1/groups/{groupId}/participants", group.id())
+        // Valid inviteSignature -> 201 with HttpOnly cookies and no token in JSON
+        MvcResult joinRes = mockMvc.perform(post("/api/v1/groups/{groupId}/participants", group.id())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "name", "Vovó Helena",
                                 "username", "vovo.helena",
-                                "pin", "1945",
+                                "password", "Ee5%ff",
                                 "inviteSignature", sig,
                                 "latitude", -23.42,
                                 "longitude", -51.93))))
@@ -242,15 +249,19 @@ class GroupPublicControllerIT {
                 .andExpect(jsonPath("$.name").value("Vovó Helena"))
                 .andExpect(jsonPath("$.username").value("vovo.helena"))
                 .andExpect(jsonPath("$.hasGeoLocation").value(true))
-                .andExpect(jsonPath("$.token").isNotEmpty());
+                .andExpect(jsonPath("$.token").doesNotExist())
+                .andReturn();
+
+        assertThat(joinRes.getResponse().getCookie(AuthCookieManager.ACCESS_TOKEN_COOKIE)).isNotNull();
+        assertThat(joinRes.getResponse().getCookie(AuthCookieManager.REFRESH_TOKEN_COOKIE)).isNotNull();
     }
 
     @Test
     void shouldRejectDuplicateRegistrationOrJoiningAlreadyDrawnGroupWith409_C11() throws Exception {
-        var u1 = applicationService.registerUser("U1", "u1.dup", "1234");
-        var u2 = applicationService.registerUser("U2", "u2.dup", "1234");
-        var u3 = applicationService.registerUser("U3", "u3.dup", "1234");
-        var u4 = applicationService.registerUser("U4", "u4.dup", "1234");
+        var u1 = applicationService.registerUser("U1", "u1.dup", "Ab1!cd");
+        var u2 = applicationService.registerUser("U2", "u2.dup", "Ab1!cd");
+        var u3 = applicationService.registerUser("U3", "u3.dup", "Ab1!cd");
+        var u4 = applicationService.registerUser("U4", "u4.dup", "Ab1!cd");
 
         var group = applicationService.createGroup(u1.userId(), "Natal Conflito");
         String sig = extractSig(group);
@@ -260,7 +271,7 @@ class GroupPublicControllerIT {
 
         // User already enrolled in the group -> 409 Conflict
         mockMvc.perform(post("/api/v1/groups/{groupId}/participants", group.id())
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + u1.token())
+                        .cookie(accessCookie(u1))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isConflict());
@@ -270,7 +281,7 @@ class GroupPublicControllerIT {
 
         // New user attempting to join after draw -> 409 Conflict
         mockMvc.perform(post("/api/v1/groups/{groupId}/participants", group.id())
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + u4.token())
+                        .cookie(accessCookie(u4))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of("inviteSignature", sig))))
                 .andExpect(status().isConflict());
@@ -278,9 +289,9 @@ class GroupPublicControllerIT {
 
     @Test
     void shouldRevealDrawnMatchWithValidUsernameAndPinAndMarkRevealed_C30() throws Exception {
-        var u1 = applicationService.registerUser("Lucas", "lucas", "1111");
-        var u2 = applicationService.registerUser("Mariana", "mariana", "2222");
-        var u3 = applicationService.registerUser("Rafael", "rafael", "3333");
+        var u1 = applicationService.registerUser("Lucas", "lucas", "Aa1!bb");
+        var u2 = applicationService.registerUser("Mariana", "mariana", "Bb2@cc");
+        var u3 = applicationService.registerUser("Rafael", "rafael", "Cc3#dd");
 
         var group = applicationService.createGroup(u1.userId(), "Natal Revelar");
         String sig = extractSig(group);
@@ -293,7 +304,7 @@ class GroupPublicControllerIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "username", "lucas",
-                                "pin", "1111"))))
+                                "pin", "Aa1!bb"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.participantId").isNotEmpty())
                 .andExpect(jsonPath("$.username").value("lucas"))
@@ -308,10 +319,10 @@ class GroupPublicControllerIT {
 
     @Test
     void shouldRejectRevealWithWrongPinOrNonMemberUsernameWith401_C31() throws Exception {
-        var u1 = applicationService.registerUser("Lucas", "lucas.c31", "1111");
-        var u2 = applicationService.registerUser("Mariana", "mariana.c31", "2222");
-        var u3 = applicationService.registerUser("Rafael", "rafael.c31", "3333");
-        applicationService.registerUser("Forasteiro", "forasteiro.c31", "4444");
+        var u1 = applicationService.registerUser("Lucas", "lucas.c31", "Aa1!bb");
+        var u2 = applicationService.registerUser("Mariana", "mariana.c31", "Bb2@cc");
+        var u3 = applicationService.registerUser("Rafael", "rafael.c31", "Cc3#dd");
+        applicationService.registerUser("Forasteiro", "forasteiro.c31", "Ff6^gg");
 
         var group = applicationService.createGroup(u1.userId(), "Natal C31");
         String sig = extractSig(group);
@@ -325,7 +336,7 @@ class GroupPublicControllerIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "username", "lucas.c31",
-                                "pin", "9999"))))
+                                "pin", "Xy9!zw"))))
                 .andExpect(status().isUnauthorized());
 
         // Username not enrolled in group -> 401
@@ -333,13 +344,13 @@ class GroupPublicControllerIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "username", "forasteiro.c31",
-                                "pin", "4444"))))
+                                "pin", "Ff6^gg"))))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     void shouldRejectRevealWhenGroupIsStillOpenWith409_C32() throws Exception {
-        var u1 = applicationService.registerUser("Lucas", "lucas.c32", "1111");
+        var u1 = applicationService.registerUser("Lucas", "lucas.c32", "Aa1!bb");
         var group = applicationService.createGroup(u1.userId(), "Natal Aberto C32");
         applicationService.registerParticipant(group.id(), u1.userId(), null, null, null);
 
@@ -347,7 +358,71 @@ class GroupPublicControllerIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "username", "lucas.c32",
-                                "pin", "1111"))))
+                                "password", "Aa1!bb"))))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    void shouldAuthenticateAndReturn409AlreadyParticipantWithCookiesWhenExistingMemberLogsInViaInvite() throws Exception {
+        var org = applicationService.registerUser("Org", "org.rejoin.it", "Ab1!cd");
+        var member = applicationService.registerUser("Membro", "membro.rejoin.it", "Bb2@cc");
+        var group = applicationService.createGroup(org.userId(), "Natal Rejoin");
+        String sig = extractSig(group);
+        applicationService.registerParticipant(group.id(), member.userId(), sig, null, null);
+
+        // Rotate invite signature to ensure already-joined member still authenticates on 409
+        applicationService.rotateInviteSignature(group.id(), org.userId());
+
+        // Visitor login (name omitted) for already-joined member -> 409 ALREADY_PARTICIPANT with HttpOnly cookies
+        MvcResult rejoinRes = mockMvc.perform(post("/api/v1/groups/{groupId}/participants", group.id())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "username", "membro.rejoin.it",
+                                "password", "Bb2@cc",
+                                "inviteSignature", sig))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("ALREADY_PARTICIPANT"))
+                .andExpect(jsonPath("$.userId").value(member.userId().toString()))
+                .andExpect(jsonPath("$.name").value("Membro"))
+                .andExpect(jsonPath("$.username").value("membro.rejoin.it"))
+                .andExpect(jsonPath("$.groupId").value(group.id().toString()))
+                .andExpect(jsonPath("$.redirectPath").value("/g/" + group.id()))
+                .andReturn();
+
+        Cookie accessCookie = rejoinRes.getResponse().getCookie(AuthCookieManager.ACCESS_TOKEN_COOKIE);
+        Cookie refreshCookie = rejoinRes.getResponse().getCookie(AuthCookieManager.REFRESH_TOKEN_COOKIE);
+        assertThat(accessCookie).isNotNull();
+        assertThat(refreshCookie).isNotNull();
+
+        // Using the issued cookie on GET /groups/{groupId} shows member as joined and participantsVisible=true
+        mockMvc.perform(get("/api/v1/groups/{groupId}", group.id()).cookie(accessCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.joined").value(true))
+                .andExpect(jsonPath("$.participantsVisible").value(true));
+
+        // Duplicate registration (name filled) with existing username -> 409 CONFLICT without cookies
+        MvcResult dupRegRes = mockMvc.perform(post("/api/v1/groups/{groupId}/participants", group.id())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Impostor",
+                                "username", "membro.rejoin.it",
+                                "password", "Cc3#dd",
+                                "inviteSignature", extractSig(applicationService.getAdminGroup(group.id(), org.userId()))))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("CONFLICT"))
+                .andReturn();
+
+        assertThat(dupRegRes.getResponse().getCookie(AuthCookieManager.ACCESS_TOKEN_COOKIE)).isNull();
+        assertThat(dupRegRes.getResponse().getCookie(AuthCookieManager.REFRESH_TOKEN_COOKIE)).isNull();
+    }
+
+    @Test
+    void shouldReturn401OnGetPublicGroupWhenAccessCookieIsInvalid() throws Exception {
+        var org = applicationService.registerUser("Org", "org.inv.cookie", "Ab1!cd");
+        var group = applicationService.createGroup(org.userId(), "Grupo Cookie");
+
+        mockMvc.perform(get("/api/v1/groups/{groupId}", group.id())
+                        .cookie(new Cookie(AuthCookieManager.ACCESS_TOKEN_COOKIE, "invalid.token.value")))
+                .andExpect(status().isUnauthorized());
     }
 }

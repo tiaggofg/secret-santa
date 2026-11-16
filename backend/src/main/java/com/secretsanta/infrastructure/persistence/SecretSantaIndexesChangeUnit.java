@@ -4,6 +4,7 @@ import io.mongock.api.annotations.ChangeUnit;
 import io.mongock.api.annotations.Execution;
 import io.mongock.api.annotations.RollbackExecution;
 import jakarta.annotation.PostConstruct;
+import java.time.Duration;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -34,6 +35,12 @@ public class SecretSantaIndexesChangeUnit {
         }
         ensureIndex(groupIndexOps, new Index().on("organizerUserId", Sort.Direction.ASC).named("organizerUserId"));
         ensureIndex(groupIndexOps, new Index().on("participants.userId", Sort.Direction.ASC).named("participants_userId"));
+
+        IndexOperations refreshTokenIndexOps = mongoTemplate.indexOps(RefreshTokenDocument.class);
+        ensureIndex(refreshTokenIndexOps, new Index().on("tokenHash", Sort.Direction.ASC).named("tokenHash").unique());
+        ensureIndex(refreshTokenIndexOps, new Index().on("userId", Sort.Direction.ASC).named("userId"));
+        ensureIndex(refreshTokenIndexOps, new Index().on("familyId", Sort.Direction.ASC).named("familyId"));
+        ensureIndex(refreshTokenIndexOps, new Index().on("expiresAt", Sort.Direction.ASC).named("expiresAt_ttl").expire(Duration.ZERO));
     }
 
     private static void ensureIndex(IndexOperations indexOps, Index index) {

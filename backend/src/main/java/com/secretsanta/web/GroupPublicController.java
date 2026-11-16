@@ -5,18 +5,19 @@ import com.secretsanta.application.SecretSantaApplicationService.GroupDiscoveryV
 import com.secretsanta.application.SecretSantaApplicationService.ParticipantRegistrationView;
 import com.secretsanta.application.SecretSantaApplicationService.PublicGroupView;
 import com.secretsanta.application.SecretSantaApplicationService.RevealMatchView;
-import com.secretsanta.application.StatelessSessionTokenService;
+import com.secretsanta.application.SecretSantaApplicationService.VisitorJoinResult;
 import com.secretsanta.application.StatelessSessionTokenService.AuthenticatedUser;
 import com.secretsanta.domain.exception.InvalidCredentialsException;
 import com.secretsanta.domain.exception.ResourceNotFoundException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.util.Optional;
 import java.util.UUID;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -27,20 +28,19 @@ import org.springframework.web.bind.annotation.RestController;
 public class GroupPublicController {
 
     private final SecretSantaApplicationService applicationService;
-    private final StatelessSessionTokenService tokenService;
+    private final AuthCookieManager cookieManager;
 
     public GroupPublicController(
             SecretSantaApplicationService applicationService,
-            StatelessSessionTokenService tokenService) {
+            AuthCookieManager cookieManager) {
         this.applicationService = applicationService;
-        this.tokenService = tokenService;
+        this.cookieManager = cookieManager;
     }
 
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
-    public GroupDiscoveryView listGroups(
-            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader) {
-        AuthenticatedUser user = tokenService.parseAndValidate(authorizationHeader);
+    public GroupDiscoveryView listGroups(HttpServletRequest httpRequest) {
+        AuthenticatedUser user = cookieManager.requireAuthenticatedUser(httpRequest);
         return applicationService.listGroupsForUser(user.userId());
     }
 
@@ -49,12 +49,9 @@ public class GroupPublicController {
     public PublicGroupView getPublicGroup(
             @PathVariable("groupId") String groupIdRaw,
             @RequestParam(value = "sig", required = false) String inviteSignature,
-            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader) {
+            HttpServletRequest httpRequest) {
         UUID groupId = parseGroupId(groupIdRaw);
-        UUID currentUserId = null;
-        if (authorizationHeader != null && !authorizationHeader.isBlank()) {
-            currentUserId = tokenService.parseAndValidate(authorizationHeader).userId();
-        }
+        UUID currentUserId = cookieManager.resolveOptionalUserId(httpRequest).orElse(null);
         return applicationService.getPublicGroup(groupId, currentUserId, inviteSignature);
     }
 
@@ -62,32 +59,42 @@ public class GroupPublicController {
     @ResponseStatus(HttpStatus.CREATED)
     public ParticipantRegistrationView joinGroup(
             @PathVariable("groupId") String groupIdRaw,
-            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader,
-            @RequestBody(required = false) JoinGroupRequest request) {
+            @RequestBody(required = false) JoinGroupRequest request,
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse) {
         UUID groupId = parseGroupId(groupIdRaw);
         Double latitude = request != null ? request.latitude() : null;
         Double longitude = request != null ? request.longitude() : null;
         String inviteSignature = request != null ? request.inviteSignature() : null;
 
-        if (authorizationHeader != null && !authorizationHeader.isBlank()) {
-            AuthenticatedUser user = tokenService.parseAndValidate(authorizationHeader);
-            return applicationService.registerParticipant(groupId, user.userId(), inviteSignature, latitude, longitude);
-        }
-
-        if (request != null
+        boolean hasVisitorCredentials = request != null
                 && ((request.name() != null && !request.name().isBlank())
-                        || (request.username() != null && !request.username().isBlank()))) {
-            return applicationService.registerVisitorAndJoinGroup(
-                    groupId,
-                    request.name(),
-                    request.username(),
-                    request.pin(),
-                    inviteSignature,
-                    latitude,
-                    longitude);
+                        || (request.username() != null && !request.username().isBlank()));
+
+        if (!hasVisitorCredentials) {
+            Optional<UUID> authenticatedUserId = cookieManager.resolveOptionalUserId(httpRequest);
+            if (authenticatedUserId.isPresent()) {
+                return applicationService.registerParticipant(
+                        groupId,
+                        authenticatedUserId.get(),
+                        inviteSignature,
+                        latitude,
+                        longitude);
+            }
+            throw new InvalidCredentialsException("Authentication token or user registration details are required to join");
         }
 
-        throw new InvalidCredentialsException("Authentication token or user registration details are required to join");
+        String effectivePassword = firstNonBlank(request.password(), request.pin());
+        VisitorJoinResult result = applicationService.registerVisitorAndJoinGroupWithTokens(
+                groupId,
+                request.name(),
+                request.username(),
+                effectivePassword,
+                inviteSignature,
+                latitude,
+                longitude);
+        cookieManager.setAuthCookies(httpResponse, httpRequest, result.accessToken(), result.refreshToken());
+        return result.participant();
     }
 
     @PostMapping("/{groupId}/participants/reveal")
@@ -99,7 +106,8 @@ public class GroupPublicController {
         if (request == null) {
             return applicationService.revealMatch(groupId, null, null);
         }
-        return applicationService.revealMatch(groupId, request.username(), request.pin());
+        String effectivePassword = firstNonBlank(request.password(), request.pin());
+        return applicationService.revealMatch(groupId, request.username(), effectivePassword);
     }
 
     static UUID parseGroupId(String groupIdRaw) {
@@ -110,9 +118,17 @@ public class GroupPublicController {
         }
     }
 
+    private static String firstNonBlank(String primary, String fallback) {
+        if (primary != null && !primary.isBlank()) {
+            return primary;
+        }
+        return fallback != null ? fallback : primary;
+    }
+
     public record JoinGroupRequest(
             String name,
             String username,
+            String password,
             String pin,
             String inviteSignature,
             Double latitude,
@@ -121,6 +137,7 @@ public class GroupPublicController {
 
     public record RevealMatchRequest(
             String username,
+            String password,
             String pin) {
     }
 }

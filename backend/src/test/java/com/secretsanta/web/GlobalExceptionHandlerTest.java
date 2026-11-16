@@ -2,6 +2,7 @@ package com.secretsanta.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.secretsanta.application.AlreadyParticipantAuthenticatedException;
 import com.secretsanta.domain.exception.DomainValidationException;
 import com.secretsanta.domain.exception.DuplicateParticipantException;
 import com.secretsanta.domain.exception.DuplicateUsernameException;
@@ -95,7 +96,7 @@ class GlobalExceptionHandlerTest {
     void shouldMapDuplicateAndStateConflictExceptionsToHttp409Conflict() {
         ProblemDetail duplicateUser = handler.handleConflict(
                 new DuplicateUsernameException("Username already taken"));
-        ProblemDetail duplicateParticipant = handler.handleConflict(
+        ProblemDetail duplicateParticipant = handler.handleDuplicateParticipant(
                 new DuplicateParticipantException("Participant already registered"));
         ProblemDetail alreadyDrawn = handler.handleConflict(
                 new GroupAlreadyDrawnException("Draw already executed"));
@@ -108,11 +109,32 @@ class GlobalExceptionHandlerTest {
 
         assertThat(duplicateUser.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
         assertThat(duplicateParticipant.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+        assertThat(duplicateParticipant.getProperties()).containsEntry("errorCode", "ALREADY_PARTICIPANT");
         assertThat(alreadyDrawn.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
         assertThat(notDrawnYet.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
         assertThat(duplicateKey.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
         assertThat(optimisticLock.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
         assertThat(alreadyDrawn.getProperties()).containsEntry("errorCode", "CONFLICT");
+    }
+
+    @Test
+    void shouldMapAlreadyParticipantAuthenticatedExceptionWithSafeMetadata() {
+        java.util.UUID userId = java.util.UUID.randomUUID();
+        java.util.UUID groupId = java.util.UUID.randomUUID();
+        ProblemDetail problem = handler.handleAlreadyParticipantAuthenticated(
+                new AlreadyParticipantAuthenticatedException(
+                        userId, "Tiago Godoy", "tiago.godoy", groupId, "acc", "ref"),
+                null,
+                null);
+
+        assertThat(problem.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+        assertThat(problem.getProperties())
+                .containsEntry("errorCode", "ALREADY_PARTICIPANT")
+                .containsEntry("userId", userId.toString())
+                .containsEntry("name", "Tiago Godoy")
+                .containsEntry("username", "tiago.godoy")
+                .containsEntry("groupId", groupId.toString())
+                .containsEntry("redirectPath", "/g/" + groupId);
     }
 
     @Test

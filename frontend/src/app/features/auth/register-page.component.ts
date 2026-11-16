@@ -5,12 +5,14 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { SecretSantaApiService } from '../../core/api/secret-santa-api.service';
 import { AuthSessionStore } from '../../core/auth/auth-session.store';
 import { FestiveIconComponent } from '../../shared/components/festive-icon.component';
+import { PasswordCriteriaIndicatorComponent } from '../../shared/components/password-criteria-indicator.component';
 import { suggestUsername } from '../../shared/formatters';
+import { evaluatePasswordCriteria, strongPasswordValidator } from '../../shared/password-policy';
 
 @Component({
   selector: 'app-register-page',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, FestiveIconComponent],
+  imports: [ReactiveFormsModule, RouterLink, FestiveIconComponent, PasswordCriteriaIndicatorComponent],
   template: `
     <div class="space-y-6">
       <section class="bg-festive-card border border-festive-border rounded-3xl p-5 shadow-sm space-y-4">
@@ -86,34 +88,34 @@ import { suggestUsername } from '../../shared/formatters';
           </div>
 
           <div>
-            <label for="reg-pin" class="block text-sm font-semibold text-ink-900 mb-1.5">
-              PIN Numérico (4 a 6 dígitos)
+            <label for="reg-password" class="block text-sm font-semibold text-ink-900 mb-1.5">
+              Crie sua senha
             </label>
             <div class="relative flex items-center">
               <input
-                id="reg-pin"
-                [type]="showRegPin() ? 'text' : 'password'"
-                inputmode="numeric"
-                maxlength="6"
-                formControlName="pin"
-                placeholder="Ex: 1234"
-                class="w-full min-h-12 rounded-xl border border-stone-300 bg-white pl-3.5 pr-12 py-2.5 text-lg tracking-widest tabular-nums text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
+                id="reg-password"
+                [type]="showRegPassword() ? 'text' : 'password'"
+                formControlName="password"
+                autocomplete="new-password"
+                placeholder="Ex: Natal@2026"
+                class="w-full min-h-12 rounded-xl border border-stone-300 bg-white pl-3.5 pr-12 py-2.5 text-base text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
               />
               <button
                 type="button"
-                (click)="showRegPin.set(!showRegPin())"
-                aria-label="Mostrar ou ocultar PIN"
+                (click)="showRegPassword.set(!showRegPassword())"
+                aria-label="Mostrar ou ocultar senha"
                 class="absolute right-1 min-w-11 min-h-11 rounded-lg flex items-center justify-center text-ink-600 hover:text-pine-900 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
               >
-                <app-festive-icon [name]="showRegPin() ? 'eye-off' : 'eye'" svgClass="w-5 h-5" />
+                <app-festive-icon [name]="showRegPassword() ? 'eye-off' : 'eye'" svgClass="w-5 h-5" />
               </button>
             </div>
+            <app-password-criteria-indicator [password]="registerForm.controls.password.value" />
             @if (
-              (registerForm.controls.pin.touched || registerForm.controls.pin.dirty) &&
-              registerForm.controls.pin.invalid
+              (registerForm.controls.password.touched || registerForm.controls.password.dirty) &&
+              registerForm.controls.password.invalid
             ) {
               <p class="text-xs text-cranberry-700 font-medium mt-1">
-                Digite apenas números de 4 a 6 dígitos (ex: 1234).
+                A senha deve atender a todos os requisitos acima.
               </p>
             }
           </div>
@@ -152,7 +154,7 @@ export class RegisterPageComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly fb = inject(NonNullableFormBuilder);
 
-  readonly showRegPin = signal<boolean>(false);
+  readonly showRegPassword = signal<boolean>(false);
   readonly isSubmitting = signal<boolean>(false);
   readonly errorMessage = signal<string | null>(null);
   private usernameManuallyEdited = false;
@@ -160,7 +162,7 @@ export class RegisterPageComponent implements OnInit {
   readonly registerForm = this.fb.group({
     name: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(60)]],
     username: ['', [Validators.required, Validators.pattern(/^[a-z0-9._-]{3,30}$/)]],
-    pin: ['', [Validators.required, Validators.pattern(/^\d{4,6}$/)]]
+    password: ['', [Validators.required, strongPasswordValidator()]]
   });
 
   ngOnInit(): void {
@@ -183,18 +185,19 @@ export class RegisterPageComponent implements OnInit {
 
   submitRegister(): void {
     this.errorMessage.set(null);
-    const { name, username, pin } = this.registerForm.getRawValue();
+    const { name, username, password } = this.registerForm.getRawValue();
     const trimmedName = name.trim();
     const normalizedUsername = username.trim().toLowerCase();
+    const passwordCriteria = evaluatePasswordCriteria(password);
 
     if (
       trimmedName.length < 2 ||
       trimmedName.length > 60 ||
       !/^[a-z0-9._-]{3,30}$/.test(normalizedUsername) ||
-      !/^\d{4,6}$/.test(pin)
+      !passwordCriteria.isValid
     ) {
       this.errorMessage.set(
-        'Preencha um nome válido (2-60 caracteres), nome de usuário (3-30 caracteres) e PIN numérico de 4 a 6 dígitos.'
+        'Preencha um nome válido (2-60 caracteres), nome de usuário (3-30 caracteres) e uma senha forte que atenda aos critérios.'
       );
       return;
     }
@@ -204,7 +207,7 @@ export class RegisterPageComponent implements OnInit {
       .register({
         name: trimmedName,
         username: normalizedUsername,
-        pin
+        password
       })
       .subscribe({
         next: (session) => {

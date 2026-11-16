@@ -1,11 +1,13 @@
 import { Component, effect, inject, OnInit, signal } from '@angular/core';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { finalize } from 'rxjs';
 import { SecretSantaApiService } from '../../core/api/secret-santa-api.service';
 import { GroupSummaryView } from '../../core/api/secret-santa-api.models';
 import { AuthSessionStore } from '../../core/auth/auth-session.store';
 import { FestiveIconComponent } from '../../shared/components/festive-icon.component';
 import { formatParticipantCount, getAvatarTone, getInitials } from '../../shared/formatters';
+import { ToastService } from '../../shared/toast/toast.service';
 
 @Component({
   selector: 'app-home-groups-page',
@@ -61,26 +63,25 @@ import { formatParticipantCount, getAvatarTone, getInitials } from '../../shared
             </div>
 
             <div>
-              <label for="login-pin" class="block text-sm font-semibold text-ink-900 mb-1.5">
-                Seu PIN (4 a 6 dígitos)
+              <label for="login-password" class="block text-sm font-semibold text-ink-900 mb-1.5">
+                Sua senha
               </label>
               <div class="relative flex items-center">
                 <input
-                  id="login-pin"
-                  [type]="showLoginPin() ? 'text' : 'password'"
-                  inputmode="numeric"
-                  maxlength="6"
-                  formControlName="pin"
-                  placeholder="••••"
-                  class="w-full min-h-12 rounded-xl border border-stone-300 bg-white pl-3.5 pr-12 py-2.5 text-lg tracking-widest tabular-nums text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
+                  id="login-password"
+                  [type]="showLoginPassword() ? 'text' : 'password'"
+                  formControlName="password"
+                  autocomplete="current-password"
+                  placeholder="Digite sua senha"
+                  class="w-full min-h-12 rounded-xl border border-stone-300 bg-white pl-3.5 pr-12 py-2.5 text-base text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
                 />
                 <button
                   type="button"
-                  (click)="showLoginPin.set(!showLoginPin())"
-                  aria-label="Mostrar ou ocultar PIN"
+                  (click)="showLoginPassword.set(!showLoginPassword())"
+                  aria-label="Mostrar ou ocultar senha"
                   class="absolute right-1 min-w-11 min-h-11 rounded-lg flex items-center justify-center text-ink-600 hover:text-pine-900 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
                 >
-                  <app-festive-icon [name]="showLoginPin() ? 'eye-off' : 'eye'" svgClass="w-5 h-5" />
+                  <app-festive-icon [name]="showLoginPassword() ? 'eye-off' : 'eye'" svgClass="w-5 h-5" />
                 </button>
               </div>
             </div>
@@ -142,16 +143,6 @@ import { formatParticipantCount, getAvatarTone, getInitials } from '../../shared
             <span>Trocar / Sair</span>
           </button>
         </section>
-
-        @if (statusMessage()) {
-          <div
-            role="status"
-            data-testid="status-message"
-            class="rounded-2xl bg-pine-50 border border-pine-200 p-3.5 text-sm text-pine-900 font-medium break-words"
-          >
-            {{ statusMessage() }}
-          </div>
-        }
 
         @if (errorMessage() && !isCreateGroupModalOpen()) {
           <div
@@ -353,18 +344,18 @@ export class HomeGroupsPageComponent implements OnInit {
   readonly authStore = inject(AuthSessionStore);
   private readonly apiService = inject(SecretSantaApiService);
   private readonly fb = inject(NonNullableFormBuilder);
+  private readonly toastService = inject(ToastService);
 
-  readonly showLoginPin = signal<boolean>(false);
+  readonly showLoginPassword = signal<boolean>(false);
   readonly myGroups = signal<GroupSummaryView[]>([]);
   readonly isSubmitting = signal<boolean>(false);
   readonly creatingGroup = signal<boolean>(false);
   readonly isCreateGroupModalOpen = signal<boolean>(false);
   readonly errorMessage = signal<string | null>(null);
-  readonly statusMessage = signal<string | null>(null);
 
   readonly loginForm = this.fb.group({
     username: ['', [Validators.required, Validators.pattern(/^[a-z0-9._-]{3,30}$/)]],
-    pin: ['', [Validators.required, Validators.pattern(/^\d{4,6}$/)]]
+    password: ['', [Validators.required]]
   });
 
   readonly createGroupForm = this.fb.group({
@@ -410,11 +401,11 @@ export class HomeGroupsPageComponent implements OnInit {
 
   submitLogin(): void {
     this.errorMessage.set(null);
-    const { username, pin } = this.loginForm.getRawValue();
+    const { username, password } = this.loginForm.getRawValue();
     const normalizedUsername = username.trim().toLowerCase();
 
-    if (!/^[a-z0-9._-]{3,30}$/.test(normalizedUsername) || !/^\d{4,6}$/.test(pin)) {
-      this.errorMessage.set('Informe seu nome de usuário e um PIN numérico de 4 a 6 dígitos.');
+    if (!/^[a-z0-9._-]{3,30}$/.test(normalizedUsername) || !password) {
+      this.errorMessage.set('Informe seu nome de usuário e sua senha.');
       return;
     }
 
@@ -422,18 +413,18 @@ export class HomeGroupsPageComponent implements OnInit {
     this.apiService
       .login({
         username: normalizedUsername,
-        pin
+        password
       })
       .subscribe({
         next: (session) => {
           this.isSubmitting.set(false);
-          this.showLoginPin.set(false);
+          this.showLoginPassword.set(false);
           this.loginForm.reset();
           this.authStore.setSession(session);
         },
         error: () => {
           this.isSubmitting.set(false);
-          this.errorMessage.set('Nome de usuário ou PIN incorreto.');
+          this.errorMessage.set('Nome de usuário ou senha incorretos.');
         }
       });
   }
@@ -454,7 +445,6 @@ export class HomeGroupsPageComponent implements OnInit {
 
   submitCreateGroup(): void {
     this.errorMessage.set(null);
-    this.statusMessage.set(null);
     const eventName = this.createGroupForm.controls.eventName.value.trim();
 
     if (eventName.length < 3 || eventName.length > 100) {
@@ -470,7 +460,7 @@ export class HomeGroupsPageComponent implements OnInit {
         this.creatingGroup.set(false);
         this.createGroupForm.reset();
         this.isCreateGroupModalOpen.set(false);
-        this.statusMessage.set(`Grupo "${created.eventName}" criado com sucesso!`);
+        this.toastService.success(`Grupo "${created.eventName}" criado com sucesso!`);
         this.loadGroups();
       },
       error: () => {
@@ -482,12 +472,22 @@ export class HomeGroupsPageComponent implements OnInit {
   }
 
   onSwitchFamilyUser(): void {
-    this.authStore.switchFamilyUser();
-    this.myGroups.set([]);
-    this.isCreateGroupModalOpen.set(false);
-    this.errorMessage.set(null);
-    this.statusMessage.set(null);
-    this.showLoginPin.set(false);
-    this.loginForm.reset();
+    this.apiService
+      .logout()
+      .pipe(
+        finalize(() => {
+          this.authStore.switchFamilyUser();
+          this.myGroups.set([]);
+          this.isCreateGroupModalOpen.set(false);
+          this.errorMessage.set(null);
+          this.showLoginPassword.set(false);
+          this.loginForm.reset();
+        })
+      )
+      .subscribe({
+        error: () => {
+          // Session cleared in finalize even if logout request fails
+        }
+      });
   }
 }

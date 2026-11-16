@@ -6,6 +6,7 @@ import { HomeGroupsPageComponent } from './home-groups-page.component';
 import { SecretSantaApiService } from '../../core/api/secret-santa-api.service';
 import { AuthSessionStore } from '../../core/auth/auth-session.store';
 import { DeviceSessionGeoStore } from '../../core/geolocation/device-session-geo.store';
+import { ToastService } from '../../shared/toast/toast.service';
 
 describe('HomeGroupsPageComponent', () => {
   let fixture: ComponentFixture<HomeGroupsPageComponent>;
@@ -15,6 +16,7 @@ describe('HomeGroupsPageComponent', () => {
 
   const apiMock = {
     login: vi.fn(),
+    logout: vi.fn(),
     listGroups: vi.fn(),
     createGroup: vi.fn()
   };
@@ -22,6 +24,7 @@ describe('HomeGroupsPageComponent', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
 
+    apiMock.logout.mockReturnValue(of(void 0));
     apiMock.listGroups.mockReturnValue(
       of({
         myGroups: [
@@ -75,10 +78,9 @@ describe('HomeGroupsPageComponent', () => {
     expect(registerLink.getAttribute('href')).toBe('/cadastro');
   });
 
-  it('logs in existing user with nome de usuário + PIN and displays only My Groups', () => {
+  it('logs in existing user with nome de usuário + senha and displays only My Groups', () => {
     apiMock.login.mockReturnValue(
       of({
-        token: 'tok-login',
         userId: 'u-1',
         name: 'Tiago Godoy',
         username: 'tiago.godoy'
@@ -87,7 +89,7 @@ describe('HomeGroupsPageComponent', () => {
 
     component.loginForm.setValue({
       username: 'tiago.godoy',
-      pin: '4321'
+      password: 'Natal@2026'
     });
     const loginForm: HTMLFormElement = fixture.nativeElement.querySelector('[data-testid="login-form"]');
     loginForm.dispatchEvent(new Event('submit'));
@@ -95,7 +97,7 @@ describe('HomeGroupsPageComponent', () => {
 
     expect(apiMock.login).toHaveBeenCalledWith({
       username: 'tiago.godoy',
-      pin: '4321'
+      password: 'Natal@2026'
     });
     expect(authStore.isAuthenticated()).toBe(true);
     expect(component.myGroups().length).toBe(1);
@@ -106,7 +108,6 @@ describe('HomeGroupsPageComponent', () => {
 
   it('opens Novo Amigo Secreto modal without groupPin field and creates group on submit', () => {
     authStore.setSession({
-      token: 'tok-1',
       userId: 'u-1',
       name: 'Tiago Godoy',
       username: 'tiago.godoy'
@@ -127,7 +128,6 @@ describe('HomeGroupsPageComponent', () => {
     expect(modal.textContent).toContain('Novo Amigo Secreto');
     expect(modal.textContent).toContain('Criar Amigo Secreto');
     expect(modal.querySelector('[data-testid="group-pin-input"]')).toBeNull();
-    expect(modal.textContent).not.toContain('PIN de Entrada do Grupo');
 
     apiMock.createGroup.mockReturnValue(
       of({
@@ -150,12 +150,13 @@ describe('HomeGroupsPageComponent', () => {
 
     expect(apiMock.createGroup).toHaveBeenCalledWith({ eventName: 'Natal 2026' });
     expect(fixture.nativeElement.querySelector('[data-testid="create-group-modal"]')).toBeNull();
-    expect(fixture.nativeElement.textContent).toContain('Grupo "Natal 2026" criado com sucesso!');
+    const toastService = TestBed.inject(ToastService);
+    expect(toastService.toasts().some((t) => t.message.includes('Grupo "Natal 2026" criado com sucesso!'))).toBe(true);
+    toastService.clear();
   });
 
-  it('clears AuthSessionStore in memory while preserving DeviceSessionGeoStore when clicking switch user button', () => {
+  it('calls POST /auth/logout and clears AuthSessionStore while preserving DeviceSessionGeoStore when clicking Trocar / Sair', () => {
     authStore.setSession({
-      token: 'tok-parent',
       userId: 'u-parent',
       name: 'Pai',
       username: 'pai.silva'
@@ -170,6 +171,7 @@ describe('HomeGroupsPageComponent', () => {
     switchBtn.click();
     fixture.detectChanges();
 
+    expect(apiMock.logout).toHaveBeenCalled();
     expect(authStore.isAuthenticated()).toBe(false);
     expect(authStore.session()).toBeNull();
     expect(geoStore.hasCapturedValidCoordinates()).toBe(true);

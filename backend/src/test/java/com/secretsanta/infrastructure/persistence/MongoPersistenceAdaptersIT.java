@@ -11,9 +11,11 @@ import com.secretsanta.domain.model.Participant;
 import com.secretsanta.domain.model.ParticipantName;
 import com.secretsanta.domain.model.PasswordResetTokenHash;
 import com.secretsanta.domain.model.PinHash;
+import com.secretsanta.domain.model.RefreshToken;
 import com.secretsanta.domain.model.SecretSantaGroup;
 import com.secretsanta.domain.model.UserAccount;
 import com.secretsanta.domain.model.Username;
+import com.secretsanta.domain.port.RefreshTokenRepository;
 import com.secretsanta.domain.port.SecretSantaGroupRepository;
 import com.secretsanta.domain.port.UserAccountRepository;
 import com.secretsanta.domain.service.DerangementDrawService;
@@ -44,6 +46,9 @@ class MongoPersistenceAdaptersIT {
     private SecretSantaGroupRepository groupRepository;
 
     @Autowired
+    private RefreshTokenRepository refreshTokenRepository;
+
+    @Autowired
     private MongoTemplate mongoTemplate;
 
     @Autowired
@@ -53,6 +58,7 @@ class MongoPersistenceAdaptersIT {
     void setUp() {
         mongoTemplate.dropCollection(UserAccountDocument.class);
         mongoTemplate.dropCollection(SecretSantaGroupDocument.class);
+        mongoTemplate.dropCollection(RefreshTokenDocument.class);
         indexesChangeUnit.ensureIndexes();
     }
 
@@ -218,5 +224,33 @@ class MongoPersistenceAdaptersIT {
                 .findByUserParticipationOrOrganizationOrderByCreatedAtDesc(userId);
         assertThat(userGroups).extracting(SecretSantaGroup::eventName)
                 .containsExactly("Grupo Participante", "Grupo Organizado");
+    }
+
+    @Test
+    void shouldPersistAndRevokeRefreshTokensByFamilyAndUserId() {
+        UUID userId = UUID.randomUUID();
+        UUID familyA = UUID.randomUUID();
+        UUID familyB = UUID.randomUUID();
+
+        RefreshToken t1 = RefreshToken.issue(userId, familyA, "hash-1", NOW.plusSeconds(3600), NOW);
+        RefreshToken t2 = RefreshToken.issue(userId, familyA, "hash-2", NOW.plusSeconds(3600), NOW.plusSeconds(10));
+        RefreshToken t3 = RefreshToken.issue(userId, familyB, "hash-3", NOW.plusSeconds(3600), NOW.plusSeconds(20));
+        refreshTokenRepository.save(t1);
+        refreshTokenRepository.save(t2);
+        refreshTokenRepository.save(t3);
+
+        assertThat(refreshTokenRepository.findByTokenHash("hash-1")).isPresent();
+
+        RefreshToken duplicateHash = RefreshToken.issue(userId, familyB, "hash-1", NOW.plusSeconds(3600), NOW);
+        assertThatThrownBy(() -> refreshTokenRepository.save(duplicateHash))
+                .isInstanceOf(DuplicateKeyException.class);
+
+        refreshTokenRepository.revokeFamily(familyA, NOW.plusSeconds(30));
+        assertThat(refreshTokenRepository.findByTokenHash("hash-1").orElseThrow().isRevoked()).isTrue();
+        assertThat(refreshTokenRepository.findByTokenHash("hash-2").orElseThrow().isRevoked()).isTrue();
+        assertThat(refreshTokenRepository.findByTokenHash("hash-3").orElseThrow().isRevoked()).isFalse();
+
+        refreshTokenRepository.revokeAllByUserId(userId, NOW.plusSeconds(40));
+        assertThat(refreshTokenRepository.findByTokenHash("hash-3").orElseThrow().isRevoked()).isTrue();
     }
 }

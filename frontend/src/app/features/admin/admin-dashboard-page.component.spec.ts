@@ -7,6 +7,7 @@ import { AdminDashboardPageComponent } from './admin-dashboard-page.component';
 import { SecretSantaApiService } from '../../core/api/secret-santa-api.service';
 import { ShareLinkService } from '../../core/share/share-link.service';
 import { AdminGroupView } from '../../core/api/secret-santa-api.models';
+import { ToastService } from '../../shared/toast/toast.service';
 
 describe('AdminDashboardPageComponent', () => {
   let fixture: ComponentFixture<AdminDashboardPageComponent>;
@@ -138,9 +139,9 @@ describe('AdminDashboardPageComponent', () => {
       pathOrUrl: signedSharePath,
       openWhatsAppFallback: true
     });
-    expect(fixture.nativeElement.querySelector('[data-testid="share-feedback"]')?.textContent).toContain(
-      signedSharePath
-    );
+    const toastService = TestBed.inject(ToastService);
+    expect(toastService.toasts().some((t) => t.message.includes(signedSharePath))).toBe(true);
+    toastService.clear();
 
     const copyBtn: HTMLButtonElement = fixture.nativeElement.querySelector(
       '[data-testid="copy-group-link-btn"]'
@@ -171,9 +172,11 @@ describe('AdminDashboardPageComponent', () => {
     expect(fixture.nativeElement.querySelector('[data-testid="signed-share-path"]')?.textContent).toContain(
       rotatedPath
     );
-    expect(fixture.nativeElement.querySelector('[data-testid="share-feedback"]')?.textContent).toContain(
-      'Novo link de convite gerado! O link anterior foi invalidado.'
-    );
+    const toastService = TestBed.inject(ToastService);
+    expect(
+      toastService.toasts().some((t) => t.message.includes('Novo link de convite gerado! O link anterior foi invalidado.'))
+    ).toBe(true);
+    toastService.clear();
   });
 
   it('generates and shares a one-time PIN reset link (/reset/{token}) for a participant', async () => {

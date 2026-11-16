@@ -33,8 +33,8 @@ public class StatelessSessionTokenService {
     @Autowired
     public StatelessSessionTokenService(
             @Value("${secretsanta.security.token-secret:default-dev-secret-key-with-at-least-32-bytes-length-2026}") String secret,
-            @Value("${secretsanta.security.token-ttl-hours:72}") long ttlHours) {
-        this(secret, Duration.ofHours(ttlHours), Clock.systemUTC());
+            @Value("${secretsanta.security.access-token-ttl-minutes:15}") long accessTokenTtlMinutes) {
+        this(secret, Duration.ofMinutes(accessTokenTtlMinutes), Clock.systemUTC());
     }
 
     public StatelessSessionTokenService(String secret, Duration tokenTtl, Clock clock) {
@@ -44,6 +44,10 @@ public class StatelessSessionTokenService {
         this.secretBytes = secret.getBytes(StandardCharsets.UTF_8);
         this.tokenTtl = Objects.requireNonNull(tokenTtl, "tokenTtl must not be null");
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
+    }
+
+    public long accessTokenTtlSeconds() {
+        return tokenTtl.toSeconds();
     }
 
     public InviteSignature generateInviteSignature(UUID groupId) {

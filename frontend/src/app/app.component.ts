@@ -1,12 +1,14 @@
 import { Component } from '@angular/core';
 import { RouterLink, RouterOutlet } from '@angular/router';
 import { FestiveIconComponent } from './shared/components/festive-icon.component';
+import { ToastContainerComponent } from './shared/toast/toast-container.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, FestiveIconComponent],
+  imports: [RouterOutlet, RouterLink, FestiveIconComponent, ToastContainerComponent],
   template: `
+    <app-toast-container />
     <div class="min-h-dvh w-full festive-desktop-backdrop md:py-6 md:px-4 flex flex-col items-center overflow-x-hidden">
       <div class="w-full md:max-w-lg min-h-dvh md:min-h-[calc(100dvh-3rem)] bg-festive-cream md:rounded-3xl md:border md:border-amber-400/35 md:shadow-2xl flex flex-col overflow-hidden">
         <header class="bg-gradient-to-r from-pine-900 via-pine-800 to-pine-900 text-white px-4 py-3.5 shadow-md">

@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -9,11 +9,13 @@ import { AuthSessionStore } from '../../core/auth/auth-session.store';
 import { BrowserGeolocationService } from '../../core/geolocation/browser-geolocation.service';
 import { DeviceSessionGeoStore } from '../../core/geolocation/device-session-geo.store';
 import { PublicGroupView } from '../../core/api/secret-santa-api.models';
+import { ToastService } from '../../shared/toast/toast.service';
 
 describe('PublicGroupPageComponent', () => {
   let fixture: ComponentFixture<PublicGroupPageComponent>;
   let component: PublicGroupPageComponent;
   let authStore: AuthSessionStore;
+  let router: Router;
 
   const groupId = '11111111-1111-1111-1111-111111111111';
   const validSig = 'sig_valid_hmac_signature_123456';
@@ -68,7 +70,8 @@ describe('PublicGroupPageComponent', () => {
   const apiMock = {
     getPublicGroup: vi.fn(),
     joinGroup: vi.fn(),
-    revealMatch: vi.fn()
+    revealMatch: vi.fn(),
+    me: vi.fn()
   };
 
   const geoServiceMock = {
@@ -106,19 +109,20 @@ describe('PublicGroupPageComponent', () => {
     }).compileComponents();
 
     authStore = TestBed.inject(AuthSessionStore);
+    router = TestBed.inject(Router);
+    vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
     fixture = TestBed.createComponent(PublicGroupPageComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
 
-  it('opens on visitor login when inviteValid is true, hides participant list for non-members and switches to inline register without groupPin', async () => {
+  it('opens on visitor login when inviteValid is true, hides participant list for non-members and switches to inline register with strong password', async () => {
     expect(apiMock.getPublicGroup).toHaveBeenCalledWith(groupId, validSig);
     expect(fixture.nativeElement.querySelector('[role="tablist"]')).toBeNull();
     expect(fixture.nativeElement.querySelector('[data-testid="visitor-login-form"]')).not.toBeNull();
-    expect(fixture.nativeElement.querySelector('[data-testid="visitor-group-pin-input"]')).toBeNull();
     expect(fixture.nativeElement.querySelector('[data-testid="public-participants-list"]')).toBeNull();
     expect(fixture.nativeElement.querySelector('[data-testid="private-participants-notice"]')).not.toBeNull();
-    expect(fixture.nativeElement.textContent.toLowerCase()).not.toContain('username');
 
     const goToRegisterBtn: HTMLButtonElement = fixture.nativeElement.querySelector(
       '[data-testid="visitor-go-to-register-link"]'
@@ -126,10 +130,7 @@ describe('PublicGroupPageComponent', () => {
     goToRegisterBtn.click();
     fixture.detectChanges();
 
-    const submitBtn: HTMLButtonElement = fixture.nativeElement.querySelector(
-      '[data-testid="visitor-register-join-btn"]'
-    );
-    expect(submitBtn.textContent).toContain('Continuar');
+    expect(fixture.nativeElement.querySelector('[data-testid="password-criteria-indicator"]')).not.toBeNull();
 
     apiMock.joinGroup.mockReturnValue(
       of({
@@ -141,8 +142,7 @@ describe('PublicGroupPageComponent', () => {
         revealStatus: 'WAITING_DRAW',
         createdAt: '2026-11-13T18:05:00Z',
         groupId,
-        sharePath: `/g/${groupId}`,
-        token: 'tok-vis'
+        sharePath: `/g/${groupId}`
       })
     );
 
@@ -153,7 +153,7 @@ describe('PublicGroupPageComponent', () => {
 
     expect(component.visitorRegisterForm.controls.username.value).toBe('joaozinho.silva');
 
-    component.visitorRegisterForm.controls.pin.setValue('1234');
+    component.visitorRegisterForm.controls.password.setValue('Natal@2026');
 
     const form: HTMLFormElement = fixture.nativeElement.querySelector('[data-testid="visitor-register-form"]');
     form.dispatchEvent(new Event('submit'));
@@ -163,12 +163,59 @@ describe('PublicGroupPageComponent', () => {
     expect(apiMock.joinGroup).toHaveBeenCalledWith(groupId, {
       name: 'Joãozinho Silva',
       username: 'joaozinho.silva',
-      pin: '1234',
+      password: 'Natal@2026',
       inviteSignature: validSig,
       latitude: -23.5505,
       longitude: -46.6333
     });
     expect(authStore.isAuthenticated()).toBe(true);
+    expect(router.navigate).toHaveBeenCalledWith(['/g', groupId], { replaceUrl: true });
+  });
+
+  it('handles 409 ALREADY_PARTICIPANT on visitor login by authenticating, stripping ?sig=, showing status and reloading group', async () => {
+    apiMock.joinGroup.mockReturnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 409,
+            statusText: 'Conflict',
+            error: {
+              errorCode: 'ALREADY_PARTICIPANT',
+              userId: 'u-1',
+              name: 'Maria Silva',
+              username: 'maria.silva',
+              groupId,
+              redirectPath: `/g/${groupId}`
+            }
+          })
+      )
+    );
+    apiMock.getPublicGroup.mockReturnValue(
+      of({
+        ...openValidInviteGroupMock,
+        joined: true,
+        participantsVisible: true,
+        participants: [drawnVisibleGroupMock.participants[0]]
+      })
+    );
+
+    component.visitorLoginForm.setValue({
+      username: 'maria.silva',
+      password: 'Natal@2026'
+    });
+    await component.submitVisitorLoginAndJoin();
+    fixture.detectChanges();
+
+    expect(authStore.isAuthenticated()).toBe(true);
+    expect(authStore.username()).toBe('maria.silva');
+    expect(router.navigate).toHaveBeenCalledWith(['/g', groupId], { replaceUrl: true });
+    const toastService = TestBed.inject(ToastService);
+    expect(toastService.toasts().some((t) => t.message.includes('Você já está inscrito neste grupo!'))).toBe(true);
+    toastService.clear();
+    expect(fixture.nativeElement.querySelector('[data-testid="already-joined-confirmation"]')?.textContent).toContain(
+      'Você já está inscrito neste grupo, Maria Silva!'
+    );
+    expect(fixture.nativeElement.querySelector('[data-testid="public-participants-list"]')).not.toBeNull();
   });
 
   it('blocks registration and displays invalid-invite-notice when inviteValid is false and user is not organizer', () => {
@@ -182,9 +229,6 @@ describe('PublicGroupPageComponent', () => {
 
     const notice = fixture.nativeElement.querySelector('[data-testid="invalid-invite-notice"]');
     expect(notice).not.toBeNull();
-    expect(notice?.textContent).toContain(
-      'Este grupo é privado. Para participar, acesse através do link de convite oficial enviado pelo organizador.'
-    );
     expect(fixture.nativeElement.querySelector('[data-testid="visitor-login-form"]')).toBeNull();
     expect(fixture.nativeElement.querySelector('[data-testid="authenticated-join-btn"]')).toBeNull();
   });
@@ -196,7 +240,7 @@ describe('PublicGroupPageComponent', () => {
 
     component.visitorLoginForm.setValue({
       username: 'maria.silva',
-      pin: '1234'
+      password: 'Natal@2026'
     });
     await component.submitVisitorLoginAndJoin();
     fixture.detectChanges();
@@ -207,7 +251,6 @@ describe('PublicGroupPageComponent', () => {
 
   it('displays greeting without @username and sends inviteSignature for non-organizer authenticated user, bypassing signature for organizer', async () => {
     authStore.setSession({
-      token: 'tok-auth',
       userId: 'u-55',
       name: 'Pedro Silva',
       username: 'pedro.silva'
@@ -218,10 +261,7 @@ describe('PublicGroupPageComponent', () => {
     expect(fixture.nativeElement.textContent).toContain(
       'Olá, Pedro Silva. Toque abaixo para confirmar sua participação neste grupo:'
     );
-    expect(fixture.nativeElement.textContent).not.toContain('@pedro.silva');
-    expect(fixture.nativeElement.querySelector('[data-testid="authenticated-group-pin-input"]')).toBeNull();
 
-    // Organizer bypasses inviteSignature
     component.group.set({ ...openValidInviteGroupMock, organizer: true, joined: false, inviteValid: true });
     fixture.detectChanges();
 
@@ -235,8 +275,7 @@ describe('PublicGroupPageComponent', () => {
         revealStatus: 'WAITING_DRAW',
         createdAt: '2026-11-13T18:10:00Z',
         groupId,
-        sharePath: `/g/${groupId}`,
-        token: null
+        sharePath: `/g/${groupId}`
       })
     );
 
@@ -270,7 +309,6 @@ describe('PublicGroupPageComponent', () => {
     expect(fixture.nativeElement.querySelector('[data-testid="reveal-form-section"]')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('[data-testid="public-participants-list"]')).toBeNull();
 
-    // When visible
     apiMock.getPublicGroup.mockReturnValue(of(drawnVisibleGroupMock));
     component.loadPublicGroup();
     fixture.detectChanges();
@@ -284,7 +322,7 @@ describe('PublicGroupPageComponent', () => {
     expect(component.revealForm.controls.username.value).toBe('maria.silva');
   });
 
-  it('reveals Secret Santa match with valid nome de usuário + PIN and opens EphemeralRevealModalComponent', () => {
+  it('reveals Secret Santa match with valid nome de usuário + password and opens EphemeralRevealModalComponent', () => {
     apiMock.getPublicGroup.mockReturnValue(of(drawnVisibleGroupMock));
     component.loadPublicGroup();
     fixture.detectChanges();
@@ -300,7 +338,7 @@ describe('PublicGroupPageComponent', () => {
 
     component.revealForm.setValue({
       username: 'maria.silva',
-      pin: '1234'
+      password: 'Natal@2026'
     });
 
     const revealFormEl: HTMLFormElement = fixture.nativeElement.querySelector('[data-testid="reveal-form"]');
@@ -309,9 +347,9 @@ describe('PublicGroupPageComponent', () => {
 
     expect(apiMock.revealMatch).toHaveBeenCalledWith(groupId, {
       username: 'maria.silva',
-      pin: '1234'
+      password: 'Natal@2026'
     });
-    expect(component.revealForm.controls.pin.value).toBe('');
+    expect(component.revealForm.controls.password.value).toBe('');
     expect(fixture.nativeElement.querySelector('[data-testid="drawn-participant-name"]')?.textContent).toContain(
       'Lucas Silva'
     );

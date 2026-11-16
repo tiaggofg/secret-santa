@@ -16,7 +16,7 @@ export class ShareLinkService {
     openWhatsAppFallback?: boolean;
   }): Promise<ShareResult> {
     const fullUrl = this.toAbsoluteUrl(options.pathOrUrl);
-    const fullMessage = options.text ? `${options.text}\n${fullUrl}` : fullUrl;
+    const fullMessage = options.text ? `${options.text}\n\n${fullUrl}` : fullUrl;
     const nav = typeof navigator !== 'undefined' ? navigator : undefined;
 
     if (nav && typeof nav.share === 'function') {

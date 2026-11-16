@@ -36,19 +36,16 @@ describe('SecretSantaApiService, AuthSessionStore & ShareLinkService', () => {
     httpMock.verify();
   });
 
-  it('stores user session in volatile Signal memory and clears it on switchFamilyUser without touching Web Storage', () => {
+  it('stores user session in volatile Signal memory without tokens and clears it on switchFamilyUser without touching Web Storage', () => {
     expect(authStore.isAuthenticated()).toBe(false);
-    expect(authStore.token()).toBeNull();
 
     authStore.setSession({
-      token: 'jwt-stateless-token',
       userId: '11111111-2222-3333-4444-555555555555',
       name: 'Tiago Godoy',
       username: 'tiago.godoy'
     });
 
     expect(authStore.isAuthenticated()).toBe(true);
-    expect(authStore.token()).toBe('jwt-stateless-token');
     expect(authStore.name()).toBe('Tiago Godoy');
     expect(authStore.username()).toBe('tiago.godoy');
     expect(window.localStorage.length).toBe(0);
@@ -58,15 +55,14 @@ describe('SecretSantaApiService, AuthSessionStore & ShareLinkService', () => {
 
     expect(authStore.isAuthenticated()).toBe(false);
     expect(authStore.session()).toBeNull();
-    expect(authStore.token()).toBeNull();
     expect(window.localStorage.length).toBe(0);
     expect(window.sessionStorage.length).toBe(0);
   });
 
-  it('calls POST /api/v1/auth/register and POST /api/v1/auth/login with expected payloads', () => {
+  it('calls auth endpoints (register, login, me, refresh, logout) with expected payloads', () => {
     let registerResult: unknown;
     service
-      .register({ name: 'Maria Silva', username: 'maria.silva', pin: '1234' })
+      .register({ name: 'Maria Silva', username: 'maria.silva', password: 'Natal@2026' })
       .subscribe((res) => (registerResult = res));
 
     const regReq = httpMock.expectOne('/api/v1/auth/register');
@@ -74,59 +70,63 @@ describe('SecretSantaApiService, AuthSessionStore & ShareLinkService', () => {
     expect(regReq.request.body).toEqual({
       name: 'Maria Silva',
       username: 'maria.silva',
-      pin: '1234'
+      password: 'Natal@2026'
     });
     regReq.flush({
-      token: 'tok-1',
       userId: 'u-1',
       name: 'Maria Silva',
       username: 'maria.silva'
     });
     expect(registerResult).toEqual({
-      token: 'tok-1',
       userId: 'u-1',
       name: 'Maria Silva',
       username: 'maria.silva'
     });
 
     let loginResult: unknown;
-    service.login({ username: 'maria.silva', pin: '1234' }).subscribe((res) => (loginResult = res));
+    service.login({ username: 'maria.silva', password: 'Natal@2026' }).subscribe((res) => (loginResult = res));
 
     const loginReq = httpMock.expectOne('/api/v1/auth/login');
     expect(loginReq.request.method).toBe('POST');
-    expect(loginReq.request.body).toEqual({ username: 'maria.silva', pin: '1234' });
+    expect(loginReq.request.body).toEqual({ username: 'maria.silva', password: 'Natal@2026' });
     loginReq.flush({
-      token: 'tok-2',
       userId: 'u-1',
       name: 'Maria Silva',
       username: 'maria.silva'
     });
     expect(loginResult).toEqual({
-      token: 'tok-2',
       userId: 'u-1',
       name: 'Maria Silva',
       username: 'maria.silva'
     });
+
+    service.me().subscribe();
+    const meReq = httpMock.expectOne('/api/v1/auth/me');
+    expect(meReq.request.method).toBe('GET');
+    meReq.flush({ userId: 'u-1', name: 'Maria Silva', username: 'maria.silva' });
+
+    service.refresh().subscribe();
+    const refreshReq = httpMock.expectOne('/api/v1/auth/refresh');
+    expect(refreshReq.request.method).toBe('POST');
+    refreshReq.flush({ userId: 'u-1', name: 'Maria Silva', username: 'maria.silva' });
+
+    service.logout().subscribe();
+    const logoutReq = httpMock.expectOne('/api/v1/auth/logout');
+    expect(logoutReq.request.method).toBe('POST');
+    logoutReq.flush(null);
   });
 
-  it('attaches Authorization Bearer header on authenticated group discovery and creation requests', () => {
-    authStore.setSession({
-      token: 'secret-bearer-token',
-      userId: 'u-1',
-      name: 'Maria Silva',
-      username: 'maria.silva'
-    });
-
+  it('calls group discovery and creation endpoints without Authorization Bearer header', () => {
     service.listGroups().subscribe();
     const listReq = httpMock.expectOne('/api/v1/groups');
     expect(listReq.request.method).toBe('GET');
-    expect(listReq.request.headers.get('Authorization')).toBe('Bearer secret-bearer-token');
+    expect(listReq.request.headers.has('Authorization')).toBe(false);
     listReq.flush({ myGroups: [] });
 
     service.createGroup({ eventName: 'Natal da Família' }).subscribe();
     const createReq = httpMock.expectOne('/api/v1/groups');
     expect(createReq.request.method).toBe('POST');
-    expect(createReq.request.headers.get('Authorization')).toBe('Bearer secret-bearer-token');
+    expect(createReq.request.headers.has('Authorization')).toBe(false);
     expect(createReq.request.body).toEqual({ eventName: 'Natal da Família' });
     createReq.flush({
       id: '11111111-1111-1111-1111-111111111111',
@@ -143,12 +143,6 @@ describe('SecretSantaApiService, AuthSessionStore & ShareLinkService', () => {
 
   it('calls getPublicGroup with optional sig query param, joinGroup with inviteSignature, and revealMatch', () => {
     const groupId = '11111111-1111-1111-1111-111111111111';
-    authStore.setSession({
-      token: 'token-join',
-      userId: 'u-2',
-      name: 'João Silva',
-      username: 'joao.silva'
-    });
 
     service.getPublicGroup(groupId, 'sig_valid_123').subscribe();
     const pubReq = httpMock.expectOne(`/api/v1/groups/${groupId}?sig=sig_valid_123`);
@@ -165,7 +159,6 @@ describe('SecretSantaApiService, AuthSessionStore & ShareLinkService', () => {
 
     const joinReq = httpMock.expectOne(`/api/v1/groups/${groupId}/participants`);
     expect(joinReq.request.method).toBe('POST');
-    expect(joinReq.request.headers.get('Authorization')).toBe('Bearer token-join');
     expect(joinReq.request.body).toEqual({
       inviteSignature: 'sig_valid_123',
       latitude: -23.55,
@@ -180,18 +173,17 @@ describe('SecretSantaApiService, AuthSessionStore & ShareLinkService', () => {
       revealStatus: 'WAITING_DRAW',
       createdAt: '2026-11-13T18:05:00Z',
       groupId,
-      sharePath: `/g/${groupId}`,
-      token: null
+      sharePath: `/g/${groupId}`
     });
 
     let revealResponse: unknown;
     service
-      .revealMatch(groupId, { username: 'joao.silva', pin: '1234' })
+      .revealMatch(groupId, { username: 'joao.silva', password: 'Natal@2026' })
       .subscribe((res) => (revealResponse = res));
 
     const revealReq = httpMock.expectOne(`/api/v1/groups/${groupId}/participants/reveal`);
     expect(revealReq.request.method).toBe('POST');
-    expect(revealReq.request.body).toEqual({ username: 'joao.silva', pin: '1234' });
+    expect(revealReq.request.body).toEqual({ username: 'joao.silva', password: 'Natal@2026' });
     revealReq.flush({
       participantId: 'p-1',
       username: 'joao.silva',
@@ -206,19 +198,12 @@ describe('SecretSantaApiService, AuthSessionStore & ShareLinkService', () => {
     });
   });
 
-  it('calls admin endpoints (getAdminGroup, rotateInviteLink, removeParticipant, executeDraw, generatePasswordResetToken) and resetPin', () => {
+  it('calls admin endpoints and resetPassword', () => {
     const groupId = '11111111-1111-1111-1111-111111111111';
-    authStore.setSession({
-      token: 'org-token',
-      userId: 'org-1',
-      name: 'Organizador',
-      username: 'org.user'
-    });
 
     service.getAdminGroup(groupId).subscribe();
     const adminGet = httpMock.expectOne(`/api/v1/groups/${groupId}/admin`);
     expect(adminGet.request.method).toBe('GET');
-    expect(adminGet.request.headers.get('Authorization')).toBe('Bearer org-token');
     adminGet.flush({
       id: groupId,
       eventName: 'Grupo X',
@@ -234,52 +219,31 @@ describe('SecretSantaApiService, AuthSessionStore & ShareLinkService', () => {
     service.rotateInviteLink(groupId).subscribe();
     const rotateReq = httpMock.expectOne(`/api/v1/groups/${groupId}/admin/invite-link/rotate`);
     expect(rotateReq.request.method).toBe('POST');
-    expect(rotateReq.request.headers.get('Authorization')).toBe('Bearer org-token');
-    rotateReq.flush({
-      id: groupId,
-      eventName: 'Grupo X',
-      organizerUserId: 'org-1',
-      status: 'OPEN',
-      geographicRestrictionRelaxed: false,
-      sharePath: `/g/${groupId}?sig=sig_rotated`,
-      createdAt: '2026-11-13T18:00:00Z',
-      drawnAt: null,
-      participants: []
-    });
+    rotateReq.flush({});
 
     service.removeParticipant(groupId, 'part-99').subscribe();
     const delReq = httpMock.expectOne(`/api/v1/groups/${groupId}/admin/participants/part-99`);
     expect(delReq.request.method).toBe('DELETE');
-    expect(delReq.request.headers.get('Authorization')).toBe('Bearer org-token');
     delReq.flush(null);
 
     service.executeDraw(groupId).subscribe();
     const drawReq = httpMock.expectOne(`/api/v1/groups/${groupId}/admin/draw`);
     expect(drawReq.request.method).toBe('POST');
-    expect(drawReq.request.headers.get('Authorization')).toBe('Bearer org-token');
     drawReq.flush({});
 
     service.generatePasswordResetToken(groupId, 'part-99').subscribe();
     const resetTokReq = httpMock.expectOne(`/api/v1/groups/${groupId}/admin/participants/part-99/reset-token`);
     expect(resetTokReq.request.method).toBe('POST');
-    expect(resetTokReq.request.headers.get('Authorization')).toBe('Bearer org-token');
-    resetTokReq.flush({
-      participantId: 'part-99',
-      userId: 'u-99',
-      username: 'dependente',
-      resetToken: 'tok-reset-123',
-      resetPath: '/reset/tok-reset-123',
-      expiresAt: '2026-11-14T18:00:00Z'
-    });
+    resetTokReq.flush({});
 
-    service.resetPin({ token: 'tok-reset-123', newPin: '5678' }).subscribe();
-    const resetPinReq = httpMock.expectOne('/api/v1/auth/reset-pin');
-    expect(resetPinReq.request.method).toBe('POST');
-    expect(resetPinReq.request.body).toEqual({ token: 'tok-reset-123', newPin: '5678' });
-    resetPinReq.flush({
+    service.resetPassword({ token: 'tok-reset-123', newPassword: 'Nova@2026' }).subscribe();
+    const resetPasswordReq = httpMock.expectOne('/api/v1/auth/reset-password');
+    expect(resetPasswordReq.request.method).toBe('POST');
+    expect(resetPasswordReq.request.body).toEqual({ token: 'tok-reset-123', newPassword: 'Nova@2026' });
+    resetPasswordReq.flush({
       userId: 'u-99',
       username: 'dependente',
-      message: 'PIN updated successfully'
+      message: 'Password updated successfully'
     });
   });
 
@@ -299,7 +263,7 @@ describe('SecretSantaApiService, AuthSessionStore & ShareLinkService', () => {
     });
 
     const expectedUrl = `${window.location.origin}/g/123?sig=abc`;
-    const expectedMessage = `Participe do grupo de amigo secreto "Natal Família" clicando no link abaixo:\n${expectedUrl}`;
+    const expectedMessage = `Participe do grupo de amigo secreto "Natal Família" clicando no link abaixo:\n\n${expectedUrl}`;
 
     expect(shareRes.method).toBe('clipboard');
     expect(writeTextSpy).toHaveBeenCalledWith(expectedMessage);

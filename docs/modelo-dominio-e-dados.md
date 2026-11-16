@@ -93,6 +93,26 @@ classDiagram
         REVEALED
     }
 
+    class RefreshToken {
+        -UUID id
+        -UUID userId
+        -UUID familyId
+        -String tokenHash
+        -Instant expiresAt
+        -Instant revokedAt
+        -Instant createdAt
+        +issue(userId, familyId, tokenHash, expiresAt, now)$ RefreshToken
+        +isExpired(now) boolean
+        +isRevoked() boolean
+        +revoke(now) RefreshToken
+    }
+
+    class PasswordValidator {
+        +int MIN_LENGTH = 6
+        +int MAX_LENGTH = 64
+        +validateRawPassword(rawPassword)$ void
+    }
+
     SecretSantaGroup "1" *-- "0..*" Participant : contém
     SecretSantaGroup --> GroupStatus
     Participant --> RevealStatus
@@ -106,7 +126,7 @@ classDiagram
 
 ## 2. Diagrama Entidade-Relacionamento / Documentos MongoDB
 
-No MongoDB (`secret_santa`), o modelo relacional é mapeado para duas collections principais, preservando a fronteira dos agregados do DDD:
+No MongoDB (`secret_santa`), o modelo relacional é mapeado para três collections principais (`users`, `secret_santa_groups` e `refresh_tokens`), preservando a fronteira dos agregados do DDD:
 
 ```mermaid
 erDiagram
@@ -115,11 +135,21 @@ erDiagram
         string name "Nome de exibição"
         string normalizedName "Nome normalizado"
         string username UK "Índice único lowercase"
-        string pinHash "Hash BCrypt do PIN"
+        string pinHash "Hash BCrypt da senha/PIN legado"
         string resetTokenHash "Índice não-único (SHA-256)"
         instant resetTokenExpiresAt "Expiração do token de reset"
         instant createdAt
         long version "@Version controle otimista"
+    }
+
+    REFRESH_TOKENS {
+        string id PK "UUID string"
+        string userId "Índice (userId)"
+        string familyId "Índice (familyId)"
+        string tokenHash UK "Índice único (SHA-256 hex)"
+        instant expiresAt "Índice TTL (expireAfter=0)"
+        instant revokedAt "Timestamp de revogação"
+        instant createdAt "Timestamp de emissão"
     }
 
     SECRET_SANTA_GROUPS {

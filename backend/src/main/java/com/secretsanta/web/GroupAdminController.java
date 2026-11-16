@@ -3,17 +3,15 @@ package com.secretsanta.web;
 import com.secretsanta.application.SecretSantaApplicationService;
 import com.secretsanta.application.SecretSantaApplicationService.AdminGroupView;
 import com.secretsanta.application.SecretSantaApplicationService.PasswordResetLinkView;
-import com.secretsanta.application.StatelessSessionTokenService;
 import com.secretsanta.application.StatelessSessionTokenService.AuthenticatedUser;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -23,21 +21,21 @@ import org.springframework.web.bind.annotation.RestController;
 public class GroupAdminController {
 
     private final SecretSantaApplicationService applicationService;
-    private final StatelessSessionTokenService tokenService;
+    private final AuthCookieManager cookieManager;
 
     public GroupAdminController(
             SecretSantaApplicationService applicationService,
-            StatelessSessionTokenService tokenService) {
+            AuthCookieManager cookieManager) {
         this.applicationService = applicationService;
-        this.tokenService = tokenService;
+        this.cookieManager = cookieManager;
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public AdminGroupView createGroup(
-            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader,
+            HttpServletRequest httpRequest,
             @RequestBody(required = false) CreateGroupRequest request) {
-        AuthenticatedUser user = tokenService.parseAndValidate(authorizationHeader);
+        AuthenticatedUser user = cookieManager.requireAuthenticatedUser(httpRequest);
         String eventName = request != null ? request.eventName() : null;
         return applicationService.createGroup(user.userId(), eventName);
     }
@@ -46,9 +44,9 @@ public class GroupAdminController {
     @ResponseStatus(HttpStatus.OK)
     public AdminGroupView getAdminGroup(
             @PathVariable("groupId") String groupIdRaw,
-            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader) {
+            HttpServletRequest httpRequest) {
         UUID groupId = GroupPublicController.parseGroupId(groupIdRaw);
-        AuthenticatedUser user = tokenService.parseAndValidate(authorizationHeader);
+        AuthenticatedUser user = cookieManager.requireAuthenticatedUser(httpRequest);
         return applicationService.getAdminGroup(groupId, user.userId());
     }
 
@@ -56,9 +54,9 @@ public class GroupAdminController {
     @ResponseStatus(HttpStatus.OK)
     public AdminGroupView rotateInviteLink(
             @PathVariable("groupId") String groupIdRaw,
-            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader) {
+            HttpServletRequest httpRequest) {
         UUID groupId = GroupPublicController.parseGroupId(groupIdRaw);
-        AuthenticatedUser user = tokenService.parseAndValidate(authorizationHeader);
+        AuthenticatedUser user = cookieManager.requireAuthenticatedUser(httpRequest);
         return applicationService.rotateInviteSignature(groupId, user.userId());
     }
 
@@ -67,9 +65,9 @@ public class GroupAdminController {
     public void removeParticipant(
             @PathVariable("groupId") String groupIdRaw,
             @PathVariable("participantId") UUID participantId,
-            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader) {
+            HttpServletRequest httpRequest) {
         UUID groupId = GroupPublicController.parseGroupId(groupIdRaw);
-        AuthenticatedUser user = tokenService.parseAndValidate(authorizationHeader);
+        AuthenticatedUser user = cookieManager.requireAuthenticatedUser(httpRequest);
         applicationService.removeParticipant(groupId, user.userId(), participantId);
     }
 
@@ -77,9 +75,9 @@ public class GroupAdminController {
     @ResponseStatus(HttpStatus.OK)
     public AdminGroupView executeDraw(
             @PathVariable("groupId") String groupIdRaw,
-            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader) {
+            HttpServletRequest httpRequest) {
         UUID groupId = GroupPublicController.parseGroupId(groupIdRaw);
-        AuthenticatedUser user = tokenService.parseAndValidate(authorizationHeader);
+        AuthenticatedUser user = cookieManager.requireAuthenticatedUser(httpRequest);
         return applicationService.executeDraw(groupId, user.userId());
     }
 
@@ -88,9 +86,9 @@ public class GroupAdminController {
     public PasswordResetLinkView generatePasswordResetToken(
             @PathVariable("groupId") String groupIdRaw,
             @PathVariable("participantId") UUID participantId,
-            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader) {
+            HttpServletRequest httpRequest) {
         UUID groupId = GroupPublicController.parseGroupId(groupIdRaw);
-        AuthenticatedUser user = tokenService.parseAndValidate(authorizationHeader);
+        AuthenticatedUser user = cookieManager.requireAuthenticatedUser(httpRequest);
         return applicationService.generatePasswordResetToken(groupId, user.userId(), participantId);
     }
 

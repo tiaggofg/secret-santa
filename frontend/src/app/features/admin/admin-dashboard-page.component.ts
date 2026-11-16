@@ -10,6 +10,7 @@ import {
 import { ShareLinkService } from '../../core/share/share-link.service';
 import { FestiveIconComponent } from '../../shared/components/festive-icon.component';
 import { formatParticipantCount, getAvatarTone, getInitials } from '../../shared/formatters';
+import { ToastService } from '../../shared/toast/toast.service';
 
 @Component({
   selector: 'app-admin-dashboard-page',
@@ -42,16 +43,6 @@ import { formatParticipantCount, getAvatarTone, getInitials } from '../../shared
           class="rounded-2xl bg-cranberry-50 border border-cranberry-200 p-4 text-sm text-cranberry-800 font-medium break-words"
         >
           {{ errorMessage() }}
-        </div>
-      }
-
-      @if (shareFeedback()) {
-        <div
-          role="status"
-          data-testid="share-feedback"
-          class="rounded-2xl bg-pine-50 border border-pine-200 p-3.5 text-sm text-pine-900 font-medium break-all"
-        >
-          {{ shareFeedback() }}
         </div>
       }
 
@@ -299,7 +290,7 @@ import { formatParticipantCount, getAvatarTone, getInitials } from '../../shared
                       class="flex-1 min-h-12 rounded-xl bg-festive-cream hover:bg-stone-200/70 border border-festive-border text-ink-900 font-semibold text-xs px-3 py-2 inline-flex items-center justify-center gap-1.5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
                     >
                       <app-festive-icon name="key" svgClass="w-3.5 h-3.5 text-gold-600" />
-                      <span>Gerar Link de Reset de PIN</span>
+                      <span>Redefinir Senha</span>
                     </button>
 
                     @if (g.status === 'OPEN') {
@@ -327,12 +318,12 @@ export class AdminDashboardPageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly apiService = inject(SecretSantaApiService);
   private readonly shareService = inject(ShareLinkService);
+  private readonly toastService = inject(ToastService);
 
   readonly group = signal<AdminGroupView | null>(null);
   readonly isBusy = signal<boolean>(false);
   readonly confirmDrawPending = signal<boolean>(false);
   readonly errorMessage = signal<string | null>(null);
-  readonly shareFeedback = signal<string | null>(null);
   readonly activeResetLink = signal<PasswordResetLinkView | null>(null);
 
   readonly canExecuteDraw = computed(() => {
@@ -390,14 +381,13 @@ export class AdminDashboardPageComponent implements OnInit {
   }
 
   async shareGroupInviteLink(g: AdminGroupView): Promise<void> {
-    this.shareFeedback.set(null);
     const result = await this.shareService.shareLink({
       title: `Amigo Secreto: ${g.eventName}`,
       text: `Participe do grupo de amigo secreto "${g.eventName}" clicando no link abaixo:`,
       pathOrUrl: g.sharePath || `/g/${g.id}`,
       openWhatsAppFallback: true
     });
-    this.shareFeedback.set(
+    this.toastService.success(
       result.method === 'web-share'
         ? 'Link do grupo compartilhado com sucesso!'
         : `Mensagem e link copiados para a área de transferência: ${result.url}`
@@ -405,9 +395,8 @@ export class AdminDashboardPageComponent implements OnInit {
   }
 
   async copyGroupPath(g: AdminGroupView): Promise<void> {
-    this.shareFeedback.set(null);
     const result = await this.shareService.copyUrl(g.sharePath || `/g/${g.id}`);
-    this.shareFeedback.set(`Link copiado para a área de transferência: ${result.url}`);
+    this.toastService.success(`Link copiado para a área de transferência: ${result.url}`);
   }
 
   onRotateInviteLink(): void {
@@ -415,13 +404,12 @@ export class AdminDashboardPageComponent implements OnInit {
       return;
     }
     this.errorMessage.set(null);
-    this.shareFeedback.set(null);
     this.isBusy.set(true);
     this.apiService.rotateInviteLink(this.groupId).subscribe({
       next: (updatedGroup) => {
         this.isBusy.set(false);
         this.group.set(updatedGroup);
-        this.shareFeedback.set('Novo link de convite gerado! O link anterior foi invalidado.');
+        this.toastService.success('Novo link de convite gerado! O link anterior foi invalidado.');
       },
       error: () => {
         this.isBusy.set(false);
@@ -460,7 +448,7 @@ export class AdminDashboardPageComponent implements OnInit {
         this.isBusy.set(false);
         this.confirmDrawPending.set(false);
         this.group.set(updatedGroup);
-        this.shareFeedback.set('Sorteio realizado com sucesso! Os participantes já podem consultar quem tiraram.');
+        this.toastService.success('Sorteio realizado com sucesso! Os participantes já podem consultar quem tiraram.');
       },
       error: (err: HttpErrorResponse) => {
         this.isBusy.set(false);
@@ -488,18 +476,18 @@ export class AdminDashboardPageComponent implements OnInit {
       },
       error: () => {
         this.isBusy.set(false);
-        this.errorMessage.set('Não foi possível gerar o link de redefinição de PIN.');
+        this.errorMessage.set('Não foi possível gerar o link de redefinição de senha.');
       }
     });
   }
 
   async shareResetLink(resetInfo: PasswordResetLinkView): Promise<void> {
     const result = await this.shareService.shareLink({
-      title: `Redefinição de PIN (@${resetInfo.username})`,
-      text: `Use este link de uso único para criar um novo PIN no Amigo Secreto:`,
+      title: `Redefinição de Senha (@${resetInfo.username})`,
+      text: `Use este link de uso único para criar uma nova senha no Amigo Secreto:`,
       pathOrUrl: resetInfo.resetPath
     });
-    this.shareFeedback.set(
+    this.toastService.success(
       result.method === 'web-share'
         ? `Link de redefinição enviado para @${resetInfo.username}!`
         : `Link de redefinição copiado: ${result.url}`

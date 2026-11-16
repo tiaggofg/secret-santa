@@ -1,5 +1,6 @@
 package com.secretsanta.web;
 
+import com.secretsanta.application.AlreadyParticipantAuthenticatedException;
 import com.secretsanta.domain.exception.DomainValidationException;
 import com.secretsanta.domain.exception.DuplicateParticipantException;
 import com.secretsanta.domain.exception.DuplicateUsernameException;
@@ -11,9 +12,12 @@ import com.secretsanta.domain.exception.InvalidInviteSignatureException;
 import com.secretsanta.domain.exception.InvalidPasswordResetTokenException;
 import com.secretsanta.domain.exception.ResourceNotFoundException;
 import com.secretsanta.domain.exception.UnauthorizedOrganizerAccessException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.net.URI;
 import java.time.Instant;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
@@ -27,6 +31,17 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private final AuthCookieManager cookieManager;
+
+    public GlobalExceptionHandler() {
+        this.cookieManager = null;
+    }
+
+    @Autowired
+    public GlobalExceptionHandler(AuthCookieManager cookieManager) {
+        this.cookieManager = cookieManager;
+    }
 
     @ExceptionHandler(DomainValidationException.class)
     public ProblemDetail handleDomainValidation(DomainValidationException ex) {
@@ -102,9 +117,34 @@ public class GlobalExceptionHandler {
         return buildProblem(HttpStatus.NOT_FOUND, "Resource Not Found", ex.getMessage(), "RESOURCE_NOT_FOUND");
     }
 
+    @ExceptionHandler(AlreadyParticipantAuthenticatedException.class)
+    public ProblemDetail handleAlreadyParticipantAuthenticated(
+            AlreadyParticipantAuthenticatedException ex,
+            HttpServletRequest request,
+            HttpServletResponse response) {
+        if (cookieManager != null) {
+            cookieManager.setAuthCookies(response, request, ex.accessToken(), ex.refreshToken());
+        }
+        ProblemDetail problem = buildProblem(
+                HttpStatus.CONFLICT,
+                "Already Participant",
+                ex.getMessage(),
+                "ALREADY_PARTICIPANT");
+        problem.setProperty("userId", ex.userId().toString());
+        problem.setProperty("name", ex.name());
+        problem.setProperty("username", ex.username());
+        problem.setProperty("groupId", ex.groupId().toString());
+        problem.setProperty("redirectPath", "/g/" + ex.groupId());
+        return problem;
+    }
+
+    @ExceptionHandler(DuplicateParticipantException.class)
+    public ProblemDetail handleDuplicateParticipant(DuplicateParticipantException ex) {
+        return buildProblem(HttpStatus.CONFLICT, "Already Participant", ex.getMessage(), "ALREADY_PARTICIPANT");
+    }
+
     @ExceptionHandler({
         DuplicateUsernameException.class,
-        DuplicateParticipantException.class,
         GroupAlreadyDrawnException.class,
         GroupNotDrawnYetException.class,
         DuplicateKeyException.class,

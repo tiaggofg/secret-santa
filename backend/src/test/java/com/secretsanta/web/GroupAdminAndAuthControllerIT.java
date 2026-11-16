@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.secretsanta.application.SecretSantaApplicationService;
 import com.secretsanta.application.SecretSantaApplicationService.AdminGroupView;
+import com.secretsanta.application.SecretSantaApplicationService.AuthSessionView;
 import com.secretsanta.application.SecretSantaApplicationService.ParticipantRegistrationView;
 import com.secretsanta.config.MongoTestContainerConfig;
 import com.secretsanta.domain.model.PasswordResetTokenHash;
@@ -19,6 +20,7 @@ import com.secretsanta.domain.model.Username;
 import com.secretsanta.domain.port.UserAccountRepository;
 import com.secretsanta.infrastructure.persistence.SecretSantaGroupDocument;
 import com.secretsanta.infrastructure.persistence.SecretSantaIndexesChangeUnit;
+import com.secretsanta.infrastructure.persistence.RefreshTokenDocument;
 import com.secretsanta.infrastructure.persistence.UserAccountDocument;
 import java.time.Instant;
 import java.util.Map;
@@ -28,7 +30,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.http.HttpHeaders;
+import jakarta.servlet.http.Cookie;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
@@ -60,8 +62,13 @@ class GroupAdminAndAuthControllerIT {
     @BeforeEach
     void setUp() {
         mongoTemplate.dropCollection(UserAccountDocument.class);
+        mongoTemplate.dropCollection(RefreshTokenDocument.class);
         mongoTemplate.dropCollection(SecretSantaGroupDocument.class);
         indexesChangeUnit.ensureIndexes();
+    }
+
+    private static Cookie accessCookie(AuthSessionView session) {
+        return new Cookie(AuthCookieManager.ACCESS_TOKEN_COOKIE, session.token());
     }
 
     private static String extractSig(AdminGroupView group) {
@@ -72,21 +79,31 @@ class GroupAdminAndAuthControllerIT {
     }
 
     @Test
-    void shouldRegisterValidUserAccountAndReturn201WithStatelessToken_C1() throws Exception {
+    void shouldRegisterValidUserAccountAndReturn201WithHttpOnlyCookies_C1() throws Exception {
         String body = objectMapper.writeValueAsString(Map.of(
                 "name", "Tiago Godoy",
                 "username", "tiago.godoy",
-                "pin", "1234"));
+                "password", "Ab1!cd"));
 
-        mockMvc.perform(post("/api/v1/auth/register")
+        MvcResult result = mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.userId").isNotEmpty())
                 .andExpect(jsonPath("$.name").value("Tiago Godoy"))
                 .andExpect(jsonPath("$.username").value("tiago.godoy"))
-                .andExpect(jsonPath("$.token").isNotEmpty())
-                .andExpect(jsonPath("$.pinHash").doesNotExist());
+                .andExpect(jsonPath("$.token").doesNotExist())
+                .andExpect(jsonPath("$.pinHash").doesNotExist())
+                .andReturn();
+
+        Cookie accessCookie = result.getResponse().getCookie(AuthCookieManager.ACCESS_TOKEN_COOKIE);
+        Cookie refreshCookie = result.getResponse().getCookie(AuthCookieManager.REFRESH_TOKEN_COOKIE);
+        assertThat(accessCookie).isNotNull();
+        assertThat(accessCookie.isHttpOnly()).isTrue();
+        assertThat(accessCookie.getPath()).isEqualTo("/api/v1");
+        assertThat(refreshCookie).isNotNull();
+        assertThat(refreshCookie.isHttpOnly()).isTrue();
+        assertThat(refreshCookie.getPath()).isEqualTo("/api/v1/auth");
 
         UserAccount saved = userAccountRepository.findByUsername(new Username("tiago.godoy")).orElseThrow();
         assertThat(saved.pinHash().value()).startsWith("$2");
@@ -100,7 +117,7 @@ class GroupAdminAndAuthControllerIT {
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "name", "A",
                                 "username", "valid.user",
-                                "pin", "1234"))))
+                                "pin", "Ab1!cd"))))
                 .andExpect(status().isBadRequest());
 
         // Username invalid pattern
@@ -109,7 +126,7 @@ class GroupAdminAndAuthControllerIT {
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "name", "Ana Silva",
                                 "username", "ab",
-                                "pin", "1234"))))
+                                "pin", "Ab1!cd"))))
                 .andExpect(status().isBadRequest());
 
         // PIN not 4..6 numeric digits
@@ -129,7 +146,7 @@ class GroupAdminAndAuthControllerIT {
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "name", "Maria Um",
                                 "username", "maria.silva",
-                                "pin", "1234"))))
+                                "pin", "Ab1!cd"))))
                 .andExpect(status().isCreated());
 
         mockMvc.perform(post("/api/v1/auth/register")
@@ -137,36 +154,69 @@ class GroupAdminAndAuthControllerIT {
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "name", "Maria Dois",
                                 "username", "  MARIA.SILVA ",
-                                "pin", "5678"))))
+                                "pin", "Cd2@ef"))))
                 .andExpect(status().isConflict());
     }
 
     @Test
-    void shouldLoginValidUserAndReturn200WithToken_C4() throws Exception {
-        applicationService.registerUser("Carlos Eduardo", "carlos.edu", "4321");
+    void shouldLoginValidUserAndReturn200WithHttpOnlyCookies_C4() throws Exception {
+        applicationService.registerUser("Carlos Eduardo", "carlos.edu", "Dd4$ee");
 
-        mockMvc.perform(post("/api/v1/auth/login")
+        MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "username", "CARLOS.EDU",
-                                "pin", "4321"))))
+                                "password", "Dd4$ee"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.userId").isNotEmpty())
                 .andExpect(jsonPath("$.name").value("Carlos Eduardo"))
                 .andExpect(jsonPath("$.username").value("carlos.edu"))
-                .andExpect(jsonPath("$.token").isNotEmpty());
+                .andExpect(jsonPath("$.token").doesNotExist())
+                .andReturn();
+
+        Cookie accessCookie = result.getResponse().getCookie(AuthCookieManager.ACCESS_TOKEN_COOKIE);
+        Cookie refreshCookie = result.getResponse().getCookie(AuthCookieManager.REFRESH_TOKEN_COOKIE);
+        assertThat(accessCookie).isNotNull();
+        assertThat(refreshCookie).isNotNull();
+
+        // /auth/me works with access cookie
+        mockMvc.perform(get("/api/v1/auth/me").cookie(accessCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("carlos.edu"));
+
+        // /auth/refresh rotates refresh cookie
+        MvcResult refreshRes = mockMvc.perform(post("/api/v1/auth/refresh").cookie(refreshCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("carlos.edu"))
+                .andReturn();
+        Cookie rotatedRefresh = refreshRes.getResponse().getCookie(AuthCookieManager.REFRESH_TOKEN_COOKIE);
+        assertThat(rotatedRefresh).isNotNull();
+        assertThat(rotatedRefresh.getValue()).isNotEqualTo(refreshCookie.getValue());
+
+        // Reusing revoked refresh cookie fails with 401 and clears cookies
+        MvcResult reuseRes = mockMvc.perform(post("/api/v1/auth/refresh").cookie(refreshCookie))
+                .andExpect(status().isUnauthorized())
+                .andReturn();
+        assertThat(reuseRes.getResponse().getCookie(AuthCookieManager.REFRESH_TOKEN_COOKIE).getMaxAge()).isZero();
+
+        // Logout clears cookies
+        MvcResult logoutRes = mockMvc.perform(post("/api/v1/auth/logout").cookie(rotatedRefresh))
+                .andExpect(status().isNoContent())
+                .andReturn();
+        assertThat(logoutRes.getResponse().getCookie(AuthCookieManager.ACCESS_TOKEN_COOKIE).getMaxAge()).isZero();
+        assertThat(logoutRes.getResponse().getCookie(AuthCookieManager.REFRESH_TOKEN_COOKIE).getMaxAge()).isZero();
     }
 
     @Test
     void shouldRejectLoginWithUnknownUserOrWrongPinWith401_C5() throws Exception {
-        applicationService.registerUser("Carlos Eduardo", "carlos.edu", "4321");
+        applicationService.registerUser("Carlos Eduardo", "carlos.edu", "Dd4$ee");
 
         // Wrong PIN
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "username", "carlos.edu",
-                                "pin", "9999"))))
+                                "pin", "Xy9!zw"))))
                 .andExpect(status().isUnauthorized());
 
         // Non-existent username
@@ -174,16 +224,16 @@ class GroupAdminAndAuthControllerIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "username", "inexistente",
-                                "pin", "4321"))))
+                                "pin", "Dd4$ee"))))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     void shouldCreateGroupSettingOrganizerUserIdAndReturn201WithSignedSharePath_C13() throws Exception {
-        var organizer = applicationService.registerUser("Organizador", "org.natal", "1234");
+        var organizer = applicationService.registerUser("Organizador", "org.natal", "Ab1!cd");
 
         MvcResult result = mockMvc.perform(post("/api/v1/groups")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + organizer.token())
+                        .cookie(accessCookie(organizer))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "eventName", "Natal da Família Silva"))))
@@ -203,10 +253,10 @@ class GroupAdminAndAuthControllerIT {
 
     @Test
     void shouldRejectGroupCreationWithShortEventNameWith400_C14() throws Exception {
-        var organizer = applicationService.registerUser("Organizador", "org.curto", "1234");
+        var organizer = applicationService.registerUser("Organizador", "org.curto", "Ab1!cd");
 
         mockMvc.perform(post("/api/v1/groups")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + organizer.token())
+                        .cookie(accessCookie(organizer))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "eventName", "Oi"))))
@@ -215,20 +265,20 @@ class GroupAdminAndAuthControllerIT {
 
     @Test
     void shouldRotateInviteLinkViaPostAdminInviteLinkRotateAndInvalidateOldLink() throws Exception {
-        var organizer = applicationService.registerUser("Org", "org.rot", "1234");
-        var member = applicationService.registerUser("Membro", "mem.rot", "1234");
+        var organizer = applicationService.registerUser("Org", "org.rot", "Ab1!cd");
+        var member = applicationService.registerUser("Membro", "mem.rot", "Ab1!cd");
 
         var group = applicationService.createGroup(organizer.userId(), "Natal Rotacionar Link");
         String oldSig = extractSig(group);
 
         // Non-organizer cannot rotate invite link -> 403
         mockMvc.perform(post("/api/v1/groups/{groupId}/admin/invite-link/rotate", group.id())
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + member.token()))
+                        .cookie(accessCookie(member)))
                 .andExpect(status().isForbidden());
 
         // Organizer rotates invite link -> 200 OK with new sharePath
         MvcResult rotatedRes = mockMvc.perform(post("/api/v1/groups/{groupId}/admin/invite-link/rotate", group.id())
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + organizer.token()))
+                        .cookie(accessCookie(organizer)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sharePath").isNotEmpty())
                 .andReturn();
@@ -240,7 +290,7 @@ class GroupAdminAndAuthControllerIT {
 
         // Old signature fails -> 403 INVALID_INVITE_SIGNATURE
         mockMvc.perform(post("/api/v1/groups/{groupId}/participants", group.id())
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + member.token())
+                        .cookie(accessCookie(member))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of("inviteSignature", oldSig))))
                 .andExpect(status().isForbidden())
@@ -248,7 +298,7 @@ class GroupAdminAndAuthControllerIT {
 
         // New signature succeeds -> 201
         mockMvc.perform(post("/api/v1/groups/{groupId}/participants", group.id())
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + member.token())
+                        .cookie(accessCookie(member))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of("inviteSignature", newSig))))
                 .andExpect(status().isCreated());
@@ -256,9 +306,9 @@ class GroupAdminAndAuthControllerIT {
 
     @Test
     void shouldReturnAdminGroupWithParticipantsAndNeverExposeSecretFields_C15_C16() throws Exception {
-        var organizer = applicationService.registerUser("Ana Org", "ana.org", "1234");
-        var u2 = applicationService.registerUser("Bruno", "bruno", "2345");
-        var u3 = applicationService.registerUser("Clara", "clara", "3456");
+        var organizer = applicationService.registerUser("Ana Org", "ana.org", "Ab1!cd");
+        var u2 = applicationService.registerUser("Bruno", "bruno", "Ee5%ff");
+        var u3 = applicationService.registerUser("Clara", "clara", "Ff6^gg");
 
         var group = applicationService.createGroup(organizer.userId(), "Natal Sigiloso");
         String sig = extractSig(group);
@@ -268,7 +318,7 @@ class GroupAdminAndAuthControllerIT {
         applicationService.executeDraw(group.id(), organizer.userId());
 
         MvcResult result = mockMvc.perform(get("/api/v1/groups/{groupId}/admin", group.id())
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + organizer.token()))
+                        .cookie(accessCookie(organizer)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.eventName").value("Natal Sigiloso"))
                 .andExpect(jsonPath("$.status").value("DRAWN"))
@@ -289,10 +339,10 @@ class GroupAdminAndAuthControllerIT {
 
     @Test
     void shouldRemoveParticipantWhileOpenWith204AndRejectWhenDrawnWith409_C17_C18() throws Exception {
-        var organizer = applicationService.registerUser("Org", "org.del", "1234");
-        var u2 = applicationService.registerUser("U2", "u2.del", "1234");
-        var u3 = applicationService.registerUser("U3", "u3.del", "1234");
-        var u4 = applicationService.registerUser("U4", "u4.del", "1234");
+        var organizer = applicationService.registerUser("Org", "org.del", "Ab1!cd");
+        var u2 = applicationService.registerUser("U2", "u2.del", "Ab1!cd");
+        var u3 = applicationService.registerUser("U3", "u3.del", "Ab1!cd");
+        var u4 = applicationService.registerUser("U4", "u4.del", "Ab1!cd");
 
         var group = applicationService.createGroup(organizer.userId(), "Natal Remoção");
         String sig = extractSig(group);
@@ -303,7 +353,7 @@ class GroupAdminAndAuthControllerIT {
 
         // C17: Delete while OPEN -> 204
         mockMvc.perform(delete("/api/v1/groups/{groupId}/admin/participants/{participantId}", group.id(), p4.id())
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + organizer.token()))
+                        .cookie(accessCookie(organizer)))
                 .andExpect(status().isNoContent());
 
         // Draw group
@@ -311,14 +361,14 @@ class GroupAdminAndAuthControllerIT {
 
         // C18: Delete after DRAWN -> 409 Conflict
         mockMvc.perform(delete("/api/v1/groups/{groupId}/admin/participants/{participantId}", group.id(), p1.id())
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + organizer.token()))
+                        .cookie(accessCookie(organizer)))
                 .andExpect(status().isConflict());
     }
 
     @Test
     void shouldRejectAdminEndpointsWith401WhenUnauthenticatedAnd403WhenNotOrganizer_C19() throws Exception {
-        var organizer = applicationService.registerUser("Org", "org.guard", "1234");
-        var otherUser = applicationService.registerUser("Outro", "outro.guard", "1234");
+        var organizer = applicationService.registerUser("Org", "org.guard", "Ab1!cd");
+        var otherUser = applicationService.registerUser("Outro", "outro.guard", "Ab1!cd");
 
         var group = applicationService.createGroup(organizer.userId(), "Natal Guard");
         ParticipantRegistrationView p = applicationService.registerParticipant(
@@ -330,26 +380,26 @@ class GroupAdminAndAuthControllerIT {
 
         // Different authenticated user -> 403
         mockMvc.perform(get("/api/v1/groups/{groupId}/admin", group.id())
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + otherUser.token()))
+                        .cookie(accessCookie(otherUser)))
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(delete("/api/v1/groups/{groupId}/admin/participants/{participantId}", group.id(), p.id())
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + otherUser.token()))
+                        .cookie(accessCookie(otherUser)))
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(post("/api/v1/groups/{groupId}/admin/draw", group.id())
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + otherUser.token()))
+                        .cookie(accessCookie(otherUser)))
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(post("/api/v1/groups/{groupId}/admin/participants/{participantId}/reset-token", group.id(), p.id())
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + otherUser.token()))
+                        .cookie(accessCookie(otherUser)))
                 .andExpect(status().isForbidden());
     }
 
     @Test
     void shouldGenerateOneTimeResetTokenWith200AndResetPinConsumingToken_C20_C36_C37() throws Exception {
-        var organizer = applicationService.registerUser("Org", "org.reset", "1234");
-        var member = applicationService.registerUser("Membro", "membro.reset", "1111");
+        var organizer = applicationService.registerUser("Org", "org.reset", "Ab1!cd");
+        var member = applicationService.registerUser("Membro", "membro.reset", "Aa1!bb");
 
         var group = applicationService.createGroup(organizer.userId(), "Natal Reset");
         ParticipantRegistrationView joined = applicationService.registerParticipant(
@@ -360,7 +410,7 @@ class GroupAdminAndAuthControllerIT {
                         "/api/v1/groups/{groupId}/admin/participants/{participantId}/reset-token",
                         group.id(),
                         joined.id())
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + organizer.token()))
+                        .cookie(accessCookie(organizer)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.participantId").value(joined.id().toString()))
                 .andExpect(jsonPath("$.username").value("membro.reset"))
@@ -378,7 +428,7 @@ class GroupAdminAndAuthControllerIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "token", resetToken,
-                                "newPin", "987654"))))
+                                "newPin", "Zz9!yy"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.username").value("membro.reset"));
 
@@ -387,7 +437,7 @@ class GroupAdminAndAuthControllerIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "username", "membro.reset",
-                                "pin", "987654"))))
+                                "pin", "Zz9!yy"))))
                 .andExpect(status().isOk());
 
         // C37: Reusing the same token or using a non-existent or expired token returns 400
@@ -395,14 +445,14 @@ class GroupAdminAndAuthControllerIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "token", resetToken,
-                                "newPin", "1234"))))
+                                "newPin", "Ab1!cd"))))
                 .andExpect(status().isBadRequest());
 
         mockMvc.perform(post("/api/v1/auth/reset-pin")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "token", "token-inexistente-xyz",
-                                "newPin", "1234"))))
+                                "newPin", "Ab1!cd"))))
                 .andExpect(status().isBadRequest());
 
         // Expired token scenario
@@ -416,15 +466,15 @@ class GroupAdminAndAuthControllerIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "token", expiredRawToken,
-                                "newPin", "1234"))))
+                                "newPin", "Ab1!cd"))))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     void shouldExecuteDrawWith200RejectFewerThanThreeWith422AndRejectAlreadyDrawnWith409_C22_C23_C24() throws Exception {
-        var organizer = applicationService.registerUser("Org", "org.draw", "1234");
-        var u2 = applicationService.registerUser("U2", "u2.draw", "1234");
-        var u3 = applicationService.registerUser("U3", "u3.draw", "1234");
+        var organizer = applicationService.registerUser("Org", "org.draw", "Ab1!cd");
+        var u2 = applicationService.registerUser("U2", "u2.draw", "Ab1!cd");
+        var u3 = applicationService.registerUser("U3", "u3.draw", "Ab1!cd");
 
         var group = applicationService.createGroup(organizer.userId(), "Natal Sorteio");
         String sig = extractSig(group);
@@ -433,7 +483,7 @@ class GroupAdminAndAuthControllerIT {
 
         // C23: Only 2 participants -> 422 Unprocessable Entity
         mockMvc.perform(post("/api/v1/groups/{groupId}/admin/draw", group.id())
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + organizer.token()))
+                        .cookie(accessCookie(organizer)))
                 .andExpect(status().isUnprocessableEntity());
 
         // Add 3rd participant
@@ -441,7 +491,7 @@ class GroupAdminAndAuthControllerIT {
 
         // C22: 3 participants -> 200 OK and status DRAWN
         mockMvc.perform(post("/api/v1/groups/{groupId}/admin/draw", group.id())
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + organizer.token()))
+                        .cookie(accessCookie(organizer)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("DRAWN"))
                 .andExpect(jsonPath("$.geographicRestrictionRelaxed").value(false))
@@ -449,7 +499,7 @@ class GroupAdminAndAuthControllerIT {
 
         // C24: Already DRAWN -> 409 Conflict
         mockMvc.perform(post("/api/v1/groups/{groupId}/admin/draw", group.id())
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + organizer.token()))
+                        .cookie(accessCookie(organizer)))
                 .andExpect(status().isConflict());
     }
 }

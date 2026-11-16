@@ -9,14 +9,12 @@ export class AuthSessionStore {
 
   readonly session = this.sessionSignal.asReadonly();
   readonly isAuthenticated = computed(() => this.sessionSignal() !== null);
-  readonly token = computed(() => this.sessionSignal()?.token ?? null);
   readonly userId = computed(() => this.sessionSignal()?.userId ?? null);
   readonly name = computed(() => this.sessionSignal()?.name ?? null);
   readonly username = computed(() => this.sessionSignal()?.username ?? null);
 
   setSession(session: AuthSessionView): void {
     this.sessionSignal.set({
-      token: session.token,
       userId: session.userId,
       name: session.name,
       username: session.username

@@ -4,25 +4,26 @@ export type RevealStatus = 'WAITING_DRAW' | 'PENDING_REVEAL' | 'REVEALED';
 export interface RegisterUserRequest {
   name: string;
   username: string;
-  pin: string;
+  password: string;
 }
 
 export interface LoginUserRequest {
   username: string;
-  pin: string;
+  password: string;
 }
 
-export interface ResetPinRequest {
+export interface ResetPasswordRequest {
   token: string;
-  newPin: string;
+  newPassword: string;
 }
 
 export interface AuthSessionView {
-  token: string;
   userId: string;
   name: string;
   username: string;
 }
+
+export type AuthUserView = AuthSessionView;
 
 export interface GroupSummaryView {
   id: string;
@@ -97,7 +98,7 @@ export interface PublicGroupView {
 export interface JoinGroupRequest {
   name?: string;
   username?: string;
-  pin?: string;
+  password?: string;
   inviteSignature?: string;
   latitude: number | null;
   longitude: number | null;
@@ -113,7 +114,6 @@ export interface ParticipantRegistrationView {
   createdAt: string;
   groupId: string;
   sharePath: string;
-  token: string | null;
 }
 
 export interface PasswordResetLinkView {
@@ -133,7 +133,7 @@ export interface PinResetResultView {
 
 export interface RevealMatchRequest {
   username: string;
-  pin: string;
+  password: string;
 }
 
 export interface RevealMatchView {

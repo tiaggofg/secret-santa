@@ -66,13 +66,21 @@
 - **Date**: 2026-11-15
 - **Status**: active
 
+### AD-009
+- **Decision**: Substituir o PIN numérico de login/revelação/reset por **senha forte de 6 a 64 caracteres** (sem espaços, com ao menos 1 maiúscula, 1 minúscula, 1 número e 1 caractere especial, mantendo retrocompatibilidade BCrypt para hashes legados no login/revelação), migrar a autenticação para **cookies `HttpOnly`** (`ss_access_token` stateless de 15 min + `ss_refresh_token` opaco de 1 hora com hash SHA-256 no MongoDB, rotação em família, detecção de reuso e revogação via `POST /api/v1/auth/logout` e reset de senha), e corrigir o fluxo de re-ingresso de participante em `POST /api/v1/groups/{groupId}/participants` para emitir os cookies de sessão na resposta `409 ALREADY_PARTICIPANT` quando a senha estiver correta, permitindo que o frontend autentique e redirecione para `/g/{groupId}`.
+- **Reason**: Elimina a trava do usuário já inscrito ao tentar entrar novamente pelo link de convite, aumenta significativamente a segurança das contas contra força bruta e XSS (removendo tokens do JavaScript) e mantém o usuário autenticado entre recarregamentos com rotação segura de sessão.
+- **Trade-off**: Adiciona a collection `refresh_tokens` com índice TTL no MongoDB e exige `withCredentials: true` + `allowCredentials(true)` em CORS entre `amigosecreto.tiagogodoy.site` e `api-amigosecreto.tiagogodoy.site` (`SameSite=Lax`).
+- **Scope**: Domínio (`PasswordValidator`, `RefreshToken`), Persistência MongoDB (`refresh_tokens`), API REST (`/api/v1/auth/*`, `POST /participants`, CORS), Frontend Angular (`AuthCredentialsInterceptor`, `APP_INITIALIZER`, `AuthSessionStore`, formulários de senha e `PublicGroupPageComponent`).
+- **Date**: 2026-11-16
+- **Status**: active
+
 ## Handoff
 
-- **Feature**: signed-invite-and-favicon (`.specs/features/signed-invite-and-favicon`)
-- **Phase / Task**: Implemented & Verified (`B1`..`B4`, `F1`..`F5`, `C1`, `V1`..`V3`) — Awaiting user approval for commit/push
-- **Completed**: `B1`..`B4` (Backend), `F1`..`F5` (Frontend), `C1` (`.github/workflows/deploy-backend.yml`), `V1` (`mvn test`, `npm test`, `npm run build`), `V2` (Playwright E2E Desktop & Mobile), `V3` (`.specs/STATE.md`, `.specs/features/signed-invite-and-favicon/tasks.md`)
+- **Feature**: rejoin-redirect-and-auth-security (`.specs/features/rejoin-redirect-and-auth-security`)
+- **Phase / Task**: Implemented & Verified (`B1`..`B4`, `F1`..`F3`, `V1`..`V3`)
+- **Completed**: Backend (`PasswordValidator`, `RefreshToken`, `refresh_tokens` MongoDB + TTL, `AuthCookieManager`, `409 ALREADY_PARTICIPANT` com cookies, `CORS` `allowCredentials`), Frontend (`authCredentialsInterceptor`, `provideAppInitializer` `/auth/me`, `PasswordCriteriaIndicatorComponent`, política de senha forte, fix de re-ingresso `/g/:groupId`), Testes unitários/integração/Playwright E2E e Documentação (`README.md`, `docs/`)
 - **In-progress** (file:line): none
-- **Next step**: Solicitar aprovação explícita do usuário e, após confirmação, executar `git add`, `git commit` e `git push`
+- **Next step**: Aguardando aprovação explícita do usuário para `git commit` e `git push` (Seção 7 do `AGENTS.md`)
 - **Blockers**: none
-- **Uncommitted files**: Backend, Frontend, `.github/workflows/deploy-backend.yml`, `.specs/STATE.md`, `.specs/features/signed-invite-and-favicon/`
+- **Uncommitted files**: alterações da spec `rejoin-redirect-and-auth-security` em `backend/`, `frontend/`, `docs/`, `README.md` e `.specs/`
 - **Branch**: main

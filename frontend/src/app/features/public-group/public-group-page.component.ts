@@ -1,6 +1,6 @@
 import { Component, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { SecretSantaApiService } from '../../core/api/secret-santa-api.service';
 import {
@@ -12,12 +12,21 @@ import { BrowserGeolocationService } from '../../core/geolocation/browser-geoloc
 import { DeviceSessionGeoStore } from '../../core/geolocation/device-session-geo.store';
 import { EphemeralRevealModalComponent } from './ephemeral-reveal-modal.component';
 import { FestiveIconComponent } from '../../shared/components/festive-icon.component';
+import { PasswordCriteriaIndicatorComponent } from '../../shared/components/password-criteria-indicator.component';
 import { formatParticipantCount, getAvatarTone, getInitials, suggestUsername } from '../../shared/formatters';
+import { evaluatePasswordCriteria, strongPasswordValidator } from '../../shared/password-policy';
+import { ToastService } from '../../shared/toast/toast.service';
 
 @Component({
   selector: 'app-public-group-page',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, EphemeralRevealModalComponent, FestiveIconComponent],
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    EphemeralRevealModalComponent,
+    FestiveIconComponent,
+    PasswordCriteriaIndicatorComponent
+  ],
   template: `
     <div class="space-y-6">
       <div class="flex flex-wrap items-center justify-between gap-2">
@@ -50,16 +59,6 @@ import { formatParticipantCount, getAvatarTone, getInitials, suggestUsername } f
         </div>
       }
 
-      @if (statusMessage()) {
-        <div
-          role="status"
-          data-testid="public-group-status"
-          class="rounded-2xl bg-pine-50 border border-pine-200 p-3.5 text-sm text-pine-900 font-medium break-words"
-        >
-          {{ statusMessage() }}
-        </div>
-      }
-
       @if (capturingGeo()) {
         <div
           role="status"
@@ -67,16 +66,6 @@ import { formatParticipantCount, getAvatarTone, getInitials, suggestUsername } f
         >
           <app-festive-icon name="spinner" svgClass="w-5 h-5 text-gold-600" />
           <span>Verificando localização da casa...</span>
-        </div>
-      }
-
-      @if (geoFallbackNotice()) {
-        <div
-          role="status"
-          data-testid="public-geo-fallback-notice"
-          class="rounded-2xl bg-gold-50 border border-gold-300 p-3.5 text-sm text-gold-950 break-words"
-        >
-          Inscrição concluída sem GPS: a restrição residencial automática de 50 metros não será aplicada a este cadastro.
         </div>
       }
 
@@ -174,26 +163,25 @@ import { formatParticipantCount, getAvatarTone, getInitials, suggestUsername } f
                   </div>
 
                   <div>
-                    <label for="vis-login-pin" class="block text-sm font-semibold text-ink-900 mb-1.5">
-                      Seu PIN pessoal (4 a 6 dígitos)
+                    <label for="vis-login-password" class="block text-sm font-semibold text-ink-900 mb-1.5">
+                      Sua senha
                     </label>
                     <div class="relative flex items-center">
                       <input
-                        id="vis-login-pin"
-                        [type]="showVisitorLoginPin() ? 'text' : 'password'"
-                        inputmode="numeric"
-                        maxlength="6"
-                        formControlName="pin"
-                        placeholder="••••"
-                        class="w-full min-h-12 rounded-xl border border-stone-300 bg-white pl-3.5 pr-12 py-2.5 text-lg tracking-widest tabular-nums text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
+                        id="vis-login-password"
+                        [type]="showVisitorLoginPassword() ? 'text' : 'password'"
+                        formControlName="password"
+                        autocomplete="current-password"
+                        placeholder="Digite sua senha"
+                        class="w-full min-h-12 rounded-xl border border-stone-300 bg-white pl-3.5 pr-12 py-2.5 text-base text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
                       />
                       <button
                         type="button"
-                        (click)="showVisitorLoginPin.set(!showVisitorLoginPin())"
-                        aria-label="Mostrar ou ocultar PIN"
+                        (click)="showVisitorLoginPassword.set(!showVisitorLoginPassword())"
+                        aria-label="Mostrar ou ocultar senha"
                         class="absolute right-1 min-w-11 min-h-11 rounded-lg flex items-center justify-center text-ink-600 hover:text-pine-900 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
                       >
-                        <app-festive-icon [name]="showVisitorLoginPin() ? 'eye-off' : 'eye'" svgClass="w-5 h-5" />
+                        <app-festive-icon [name]="showVisitorLoginPassword() ? 'eye-off' : 'eye'" svgClass="w-5 h-5" />
                       </button>
                     </div>
                   </div>
@@ -260,28 +248,28 @@ import { formatParticipantCount, getAvatarTone, getInitials, suggestUsername } f
                   </div>
 
                   <div>
-                    <label for="vis-pin" class="block text-sm font-semibold text-ink-900 mb-1.5">
-                      Seu PIN pessoal (4 a 6 dígitos)
+                    <label for="vis-password" class="block text-sm font-semibold text-ink-900 mb-1.5">
+                      Crie sua senha
                     </label>
                     <div class="relative flex items-center">
                       <input
-                        id="vis-pin"
-                        [type]="showVisitorRegPin() ? 'text' : 'password'"
-                        inputmode="numeric"
-                        maxlength="6"
-                        formControlName="pin"
-                        placeholder="Ex: 1234"
-                        class="w-full min-h-12 rounded-xl border border-stone-300 bg-white pl-3.5 pr-12 py-2.5 text-lg tracking-widest tabular-nums text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
+                        id="vis-password"
+                        [type]="showVisitorRegPassword() ? 'text' : 'password'"
+                        formControlName="password"
+                        autocomplete="new-password"
+                        placeholder="Ex: Natal@2026"
+                        class="w-full min-h-12 rounded-xl border border-stone-300 bg-white pl-3.5 pr-12 py-2.5 text-base text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
                       />
                       <button
                         type="button"
-                        (click)="showVisitorRegPin.set(!showVisitorRegPin())"
-                        aria-label="Mostrar ou ocultar PIN"
+                        (click)="showVisitorRegPassword.set(!showVisitorRegPassword())"
+                        aria-label="Mostrar ou ocultar senha"
                         class="absolute right-1 min-w-11 min-h-11 rounded-lg flex items-center justify-center text-ink-600 hover:text-pine-900 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
                       >
-                        <app-festive-icon [name]="showVisitorRegPin() ? 'eye-off' : 'eye'" svgClass="w-5 h-5" />
+                        <app-festive-icon [name]="showVisitorRegPassword() ? 'eye-off' : 'eye'" svgClass="w-5 h-5" />
                       </button>
                     </div>
+                    <app-password-criteria-indicator [password]="visitorRegisterForm.controls.password.value" />
                   </div>
 
                   <button
@@ -337,7 +325,7 @@ import { formatParticipantCount, getAvatarTone, getInitials, suggestUsername } f
                 <div data-testid="already-joined-confirmation" class="space-y-1">
                   <p class="text-base font-bold text-pine-950 flex items-center gap-1.5">
                     <app-festive-icon name="check" svgClass="w-5 h-5 text-pine-700 shrink-0" />
-                    <span>Você já está inscrito neste grupo, {{ authStore.name() }}!</span>
+                    <span>Você já está inscrito neste grupo, {{ currentParticipantDisplayName(g) }}!</span>
                   </p>
                   <p class="text-xs text-pine-800">
                     Aguarde o organizador realizar o sorteio.
@@ -364,7 +352,7 @@ import { formatParticipantCount, getAvatarTone, getInitials, suggestUsername } f
                   1. Informe seu nome de usuário
                 </div>
                 <div class="rounded-xl bg-festive-cream border border-festive-border p-2 text-ink-900">
-                  2. Digite seu PIN
+                  2. Digite sua senha
                 </div>
                 <div class="rounded-xl bg-cranberry-50 border border-cranberry-200 p-2 text-cranberry-800">
                   3. Abra seu presente
@@ -393,26 +381,25 @@ import { formatParticipantCount, getAvatarTone, getInitials, suggestUsername } f
               </div>
 
               <div>
-                <label for="reveal-pin" class="block text-sm font-semibold text-ink-900 mb-1.5">
-                  Seu PIN (4 a 6 dígitos)
+                <label for="reveal-password" class="block text-sm font-semibold text-ink-900 mb-1.5">
+                  Sua senha
                 </label>
                 <div class="relative flex items-center">
                   <input
-                    id="reveal-pin"
-                    [type]="showRevealPin() ? 'text' : 'password'"
-                    inputmode="numeric"
-                    maxlength="6"
-                    formControlName="pin"
-                    placeholder="••••"
-                    class="w-full min-h-12 rounded-xl border border-stone-300 bg-white pl-3.5 pr-12 py-2.5 text-lg tracking-widest tabular-nums text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
+                    id="reveal-password"
+                    [type]="showRevealPassword() ? 'text' : 'password'"
+                    formControlName="password"
+                    autocomplete="current-password"
+                    placeholder="Digite sua senha"
+                    class="w-full min-h-12 rounded-xl border border-stone-300 bg-white pl-3.5 pr-12 py-2.5 text-base text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
                   />
                   <button
                     type="button"
-                    (click)="showRevealPin.set(!showRevealPin())"
-                    aria-label="Mostrar ou ocultar PIN"
+                    (click)="showRevealPassword.set(!showRevealPassword())"
+                    aria-label="Mostrar ou ocultar senha"
                     class="absolute right-1 min-w-11 min-h-11 rounded-lg flex items-center justify-center text-ink-600 hover:text-pine-900 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
                   >
-                    <app-festive-icon [name]="showRevealPin() ? 'eye-off' : 'eye'" svgClass="w-5 h-5" />
+                    <app-festive-icon [name]="showRevealPassword() ? 'eye-off' : 'eye'" svgClass="w-5 h-5" />
                   </button>
                 </div>
               </div>
@@ -551,20 +538,20 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
   readonly authStore = inject(AuthSessionStore);
   readonly geoStore = inject(DeviceSessionGeoStore);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly apiService = inject(SecretSantaApiService);
   private readonly geoService = inject(BrowserGeolocationService);
   private readonly fb = inject(NonNullableFormBuilder);
+  private readonly toastService = inject(ToastService);
 
   readonly group = signal<PublicGroupView | null>(null);
   readonly visitorMode = signal<'login' | 'register'>('login');
-  readonly showVisitorRegPin = signal<boolean>(false);
-  readonly showVisitorLoginPin = signal<boolean>(false);
-  readonly showRevealPin = signal<boolean>(false);
+  readonly showVisitorRegPassword = signal<boolean>(false);
+  readonly showVisitorLoginPassword = signal<boolean>(false);
+  readonly showRevealPassword = signal<boolean>(false);
   readonly isSubmitting = signal<boolean>(false);
   readonly capturingGeo = signal<boolean>(false);
   readonly errorMessage = signal<string | null>(null);
-  readonly statusMessage = signal<string | null>(null);
-  readonly geoFallbackNotice = signal<boolean>(false);
 
   readonly revealedFriendName = signal<string | null>(null);
   readonly revealedByUsername = signal<string | null>(null);
@@ -576,17 +563,17 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
   readonly visitorRegisterForm = this.fb.group({
     name: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(60)]],
     username: ['', [Validators.required, Validators.pattern(/^[a-z0-9._-]{3,30}$/)]],
-    pin: ['', [Validators.required, Validators.pattern(/^\d{4,6}$/)]]
+    password: ['', [Validators.required, strongPasswordValidator()]]
   });
 
   readonly visitorLoginForm = this.fb.group({
     username: ['', [Validators.required, Validators.pattern(/^[a-z0-9._-]{3,30}$/)]],
-    pin: ['', [Validators.required, Validators.pattern(/^\d{4,6}$/)]]
+    password: ['', [Validators.required]]
   });
 
   readonly revealForm = this.fb.group({
     username: ['', [Validators.required, Validators.pattern(/^[a-z0-9._-]{3,30}$/)]],
-    pin: ['', [Validators.required, Validators.pattern(/^\d{4,6}$/)]]
+    password: ['', [Validators.required]]
   });
 
   ngOnInit(): void {
@@ -604,7 +591,7 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.revealedFriendName.set(null);
     this.revealedByUsername.set(null);
-    this.revealForm.controls.pin.setValue('');
+    this.revealForm.controls.password.setValue('');
   }
 
   participantCountLabel(count: number): string {
@@ -624,6 +611,15 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
 
   avatarTone(name: string): string {
     return getAvatarTone(name);
+  }
+
+  currentParticipantDisplayName(g: PublicGroupView): string {
+    const userId = this.authStore.userId();
+    const username = this.authStore.username();
+    const matched = g.participants.find(
+      (p) => (userId && p.userId === userId) || (username && p.username === username)
+    );
+    return matched?.name ?? this.authStore.name() ?? username ?? '';
   }
 
   loadPublicGroup(): void {
@@ -656,8 +652,7 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
 
   async submitVisitorRegisterAndJoin(): Promise<void> {
     this.errorMessage.set(null);
-    this.statusMessage.set(null);
-    const { name, username, pin } = this.visitorRegisterForm.getRawValue();
+    const { name, username, password } = this.visitorRegisterForm.getRawValue();
     const trimmedName = name.trim();
     const normalizedUsername = username.trim().toLowerCase();
 
@@ -665,10 +660,10 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
       trimmedName.length < 2 ||
       trimmedName.length > 60 ||
       !/^[a-z0-9._-]{3,30}$/.test(normalizedUsername) ||
-      !/^\d{4,6}$/.test(pin)
+      !evaluatePasswordCriteria(password).isValid
     ) {
       this.errorMessage.set(
-        'Informe seu nome (2-60 caracteres), nome de usuário válido e um PIN pessoal de 4 a 6 dígitos.'
+        'Informe seu nome (2-60 caracteres), nome de usuário válido e uma senha forte que atenda aos critérios.'
       );
       return;
     }
@@ -678,14 +673,16 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
     const geo = await this.geoService.captureCoordinatesForJoin();
     this.capturingGeo.set(false);
     if (geo.fallbackUsed) {
-      this.geoFallbackNotice.set(true);
+      this.toastService.warning(
+        'Inscrição concluída sem GPS: a restrição residencial automática de 50 metros não será aplicada a este cadastro.'
+      );
     }
 
     this.apiService
       .joinGroup(this.groupId, {
         name: trimmedName,
         username: normalizedUsername,
-        pin,
+        password,
         inviteSignature: this.inviteSignature || undefined,
         latitude: geo.latitude,
         longitude: geo.longitude
@@ -693,19 +690,16 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (registration) => {
           this.isSubmitting.set(false);
-          if (registration.token) {
-            this.authStore.setSession({
-              token: registration.token,
-              userId: registration.userId,
-              name: registration.name,
-              username: registration.username
-            });
-          }
-          this.showVisitorRegPin.set(false);
+          this.authStore.setSession({
+            userId: registration.userId,
+            name: registration.name,
+            username: registration.username
+          });
+          this.showVisitorRegPassword.set(false);
           this.visitorRegisterForm.reset();
           this.visitorUsernameManuallyEdited = false;
-          this.statusMessage.set('Cadastro e inscrição no grupo realizados com sucesso!');
-          this.loadPublicGroup();
+          this.toastService.success('Cadastro e inscrição no grupo realizados com sucesso!');
+          this.clearInviteQueryAndReload();
         },
         error: (err: HttpErrorResponse) => {
           this.isSubmitting.set(false);
@@ -726,12 +720,11 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
 
   async submitVisitorLoginAndJoin(): Promise<void> {
     this.errorMessage.set(null);
-    this.statusMessage.set(null);
-    const { username, pin } = this.visitorLoginForm.getRawValue();
+    const { username, password } = this.visitorLoginForm.getRawValue();
     const normalizedUsername = username.trim().toLowerCase();
 
-    if (!/^[a-z0-9._-]{3,30}$/.test(normalizedUsername) || !/^\d{4,6}$/.test(pin)) {
-      this.errorMessage.set('Informe seu nome de usuário e seu PIN pessoal (4 a 6 dígitos).');
+    if (!/^[a-z0-9._-]{3,30}$/.test(normalizedUsername) || !password) {
+      this.errorMessage.set('Informe seu nome de usuário e sua senha.');
       return;
     }
 
@@ -740,13 +733,15 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
     const geo = await this.geoService.captureCoordinatesForJoin();
     this.capturingGeo.set(false);
     if (geo.fallbackUsed) {
-      this.geoFallbackNotice.set(true);
+      this.toastService.warning(
+        'Inscrição concluída sem GPS: a restrição residencial automática de 50 metros não será aplicada a este cadastro.'
+      );
     }
 
     this.apiService
       .joinGroup(this.groupId, {
         username: normalizedUsername,
-        pin,
+        password,
         inviteSignature: this.inviteSignature || undefined,
         latitude: geo.latitude,
         longitude: geo.longitude
@@ -754,18 +749,15 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (registration) => {
           this.isSubmitting.set(false);
-          if (registration.token) {
-            this.authStore.setSession({
-              token: registration.token,
-              userId: registration.userId,
-              name: registration.name,
-              username: registration.username
-            });
-          }
-          this.showVisitorLoginPin.set(false);
+          this.authStore.setSession({
+            userId: registration.userId,
+            name: registration.name,
+            username: registration.username
+          });
+          this.showVisitorLoginPassword.set(false);
           this.visitorLoginForm.reset();
-          this.statusMessage.set('Login e inscrição no grupo realizados com sucesso!');
-          this.loadPublicGroup();
+          this.toastService.success('Login e inscrição no grupo realizados com sucesso!');
+          this.clearInviteQueryAndReload();
         },
         error: (err: HttpErrorResponse) => {
           this.isSubmitting.set(false);
@@ -774,10 +766,9 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
               'Link de convite inválido ou expirado. Solicite o link oficial ao organizador do grupo.'
             );
           } else if (err.status === 401) {
-            this.errorMessage.set('Nome de usuário ou PIN pessoal incorreto.');
+            this.errorMessage.set('Nome de usuário ou senha incorretos.');
           } else if (err.status === 409) {
-            this.statusMessage.set('Você já está inscrito neste grupo!');
-            this.loadPublicGroup();
+            this.handleAlreadyParticipantRedirect(err);
           } else {
             this.errorMessage.set('Não foi possível entrar no grupo.');
           }
@@ -785,9 +776,34 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
       });
   }
 
+  private handleAlreadyParticipantRedirect(err: HttpErrorResponse): void {
+    const body = err.error as { userId?: string; name?: string; username?: string } | null;
+    if (body?.userId && body?.username) {
+      this.authStore.setSession({
+        userId: body.userId,
+        name: body.name ?? body.username,
+        username: body.username
+      });
+    } else {
+      this.apiService.me().subscribe({
+        next: (user) => this.authStore.setSession(user),
+        error: () => {}
+      });
+    }
+    this.showVisitorLoginPassword.set(false);
+    this.visitorLoginForm.reset();
+    this.toastService.success('Você já está inscrito neste grupo!');
+    this.clearInviteQueryAndReload();
+  }
+
+  private clearInviteQueryAndReload(): void {
+    this.inviteSignature = '';
+    void this.router.navigate(['/g', this.groupId], { replaceUrl: true });
+    this.loadPublicGroup();
+  }
+
   async joinWithCurrentAuthenticatedUser(): Promise<void> {
     this.errorMessage.set(null);
-    this.statusMessage.set(null);
     const currentGroup = this.group();
     const isOrganizer = currentGroup?.organizer ?? false;
 
@@ -797,7 +813,9 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
     const geo = await this.geoService.captureCoordinatesForJoin();
     this.capturingGeo.set(false);
     if (geo.fallbackUsed) {
-      this.geoFallbackNotice.set(true);
+      this.toastService.warning(
+        'Inscrição concluída sem GPS: a restrição residencial automática de 50 metros não será aplicada a este cadastro.'
+      );
     }
 
     this.apiService
@@ -809,8 +827,8 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
       .subscribe({
         next: () => {
           this.isSubmitting.set(false);
-          this.statusMessage.set('Inscrição confirmada com sucesso!');
-          this.loadPublicGroup();
+          this.toastService.success('Inscrição confirmada com sucesso!');
+          this.clearInviteQueryAndReload();
         },
         error: (err: HttpErrorResponse) => {
           this.isSubmitting.set(false);
@@ -818,6 +836,9 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
             this.errorMessage.set(
               'Link de convite inválido ou expirado. Solicite o link oficial ao organizador do grupo.'
             );
+          } else if (err.status === 409) {
+            this.toastService.success('Você já está inscrito neste grupo!');
+            this.clearInviteQueryAndReload();
           } else {
             this.errorMessage.set('Não foi possível concluir sua inscrição.');
           }
@@ -827,17 +848,17 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
 
   onSelectParticipantFromList(participant: PublicParticipantView): void {
     this.revealForm.controls.username.setValue(participant.username);
-    this.revealForm.controls.pin.setValue('');
+    this.revealForm.controls.password.setValue('');
     this.errorMessage.set(null);
   }
 
   submitReveal(): void {
     this.errorMessage.set(null);
-    const { username, pin } = this.revealForm.getRawValue();
+    const { username, password } = this.revealForm.getRawValue();
     const normalizedUsername = username.trim().toLowerCase();
 
-    if (!/^[a-z0-9._-]{3,30}$/.test(normalizedUsername) || !/^\d{4,6}$/.test(pin)) {
-      this.errorMessage.set('Informe o nome de usuário e o PIN numérico de 4 a 6 dígitos.');
+    if (!/^[a-z0-9._-]{3,30}$/.test(normalizedUsername) || !password) {
+      this.errorMessage.set('Informe o nome de usuário e sua senha.');
       return;
     }
 
@@ -845,22 +866,22 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
     this.apiService
       .revealMatch(this.groupId, {
         username: normalizedUsername,
-        pin
+        password
       })
       .subscribe({
         next: (result) => {
           this.isSubmitting.set(false);
-          this.showRevealPin.set(false);
-          this.revealForm.controls.pin.setValue('');
+          this.showRevealPassword.set(false);
+          this.revealForm.controls.password.setValue('');
           this.revealedByUsername.set(result.username);
           this.revealedFriendName.set(result.drawnParticipantName);
           this.loadPublicGroup();
         },
         error: (err: HttpErrorResponse) => {
           this.isSubmitting.set(false);
-          this.revealForm.controls.pin.setValue('');
+          this.revealForm.controls.password.setValue('');
           if (err.status === 401) {
-            this.errorMessage.set('Nome de usuário ou PIN incorreto.');
+            this.errorMessage.set('Nome de usuário ou senha incorretos.');
           } else if (err.status === 409) {
             this.errorMessage.set('O sorteio ainda não foi realizado.');
           } else {
@@ -873,7 +894,7 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
   onModalClosed(): void {
     this.revealedFriendName.set(null);
     this.revealedByUsername.set(null);
-    this.revealForm.controls.pin.setValue('');
+    this.revealForm.controls.password.setValue('');
   }
 
   formatParticipantRevealStatus(participant: PublicParticipantView): string {

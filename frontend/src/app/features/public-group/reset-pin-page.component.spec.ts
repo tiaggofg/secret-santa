@@ -11,7 +11,7 @@ describe('ResetPinPageComponent', () => {
   let component: ResetPinPageComponent;
 
   const apiMock = {
-    resetPin: vi.fn()
+    resetPassword: vi.fn()
   };
 
   beforeEach(async () => {
@@ -38,31 +38,32 @@ describe('ResetPinPageComponent', () => {
     fixture.detectChanges();
   });
 
-  it('validates that the new PIN is 4 to 6 numeric digits before calling the API', () => {
-    const input: HTMLInputElement = fixture.nativeElement.querySelector('#new-pin');
-    expect(input.getAttribute('inputmode')).toBe('numeric');
+  it('validates strong password criteria before calling the API and renders criteria indicator', () => {
+    const input: HTMLInputElement = fixture.nativeElement.querySelector('#new-password');
+    expect(input).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="password-criteria-indicator"]')).not.toBeNull();
 
-    component.resetForm.setValue({ newPin: '12a' });
-    component.submitResetPin();
+    component.resetForm.setValue({ newPassword: 'weak' });
+    component.submitResetPassword();
     fixture.detectChanges();
 
-    expect(apiMock.resetPin).not.toHaveBeenCalled();
+    expect(apiMock.resetPassword).not.toHaveBeenCalled();
     expect(fixture.nativeElement.querySelector('[data-testid="reset-pin-error"]')?.textContent).toContain(
-      '4 a 6 dígitos numéricos'
+      'requisitos mínimos'
     );
   });
 
-  it('submits { token, newPin } to POST /api/v1/auth/reset-pin and shows confirmation with link to proceed', () => {
-    apiMock.resetPin.mockReturnValue(
+  it('submits { token, newPassword } to POST /api/v1/auth/reset-password and shows confirmation with link to proceed', () => {
+    apiMock.resetPassword.mockReturnValue(
       of({
         userId: 'u-1',
         username: 'maria.silva',
-        message: 'PIN updated successfully'
+        message: 'Password updated successfully'
       })
     );
 
-    const input: HTMLInputElement = fixture.nativeElement.querySelector('#new-pin');
-    input.value = '567890';
+    const input: HTMLInputElement = fixture.nativeElement.querySelector('#new-password');
+    input.value = 'Nova@2026';
     input.dispatchEvent(new Event('input'));
     fixture.detectChanges();
 
@@ -70,9 +71,9 @@ describe('ResetPinPageComponent', () => {
     form.dispatchEvent(new Event('submit'));
     fixture.detectChanges();
 
-    expect(apiMock.resetPin).toHaveBeenCalledWith({
+    expect(apiMock.resetPassword).toHaveBeenCalledWith({
       token: 'one-time-token-abc',
-      newPin: '567890'
+      newPassword: 'Nova@2026'
     });
     expect(component.resetCompleted()).toBe(true);
     expect(fixture.nativeElement.querySelector('[data-testid="reset-pin-success"]')?.textContent).toContain(
@@ -82,12 +83,12 @@ describe('ResetPinPageComponent', () => {
   });
 
   it('displays clear error message instructing to ask organizer for a new link when token is expired or already used (HTTP 400)', () => {
-    apiMock.resetPin.mockReturnValue(
+    apiMock.resetPassword.mockReturnValue(
       throwError(() => new HttpErrorResponse({ status: 400, statusText: 'Bad Request' }))
     );
 
-    component.resetForm.setValue({ newPin: '4321' });
-    component.submitResetPin();
+    component.resetForm.setValue({ newPassword: 'Nova@2026' });
+    component.submitResetPassword();
     fixture.detectChanges();
 
     const alert = fixture.nativeElement.querySelector('[data-testid="reset-pin-error"]');
@@ -96,9 +97,9 @@ describe('ResetPinPageComponent', () => {
     expect(alert.textContent).toContain('organizador');
   });
 
-  it('clears the PIN field from memory on component destroy', () => {
-    component.resetForm.setValue({ newPin: '9876' });
+  it('clears the password field from memory on component destroy', () => {
+    component.resetForm.setValue({ newPassword: 'Nova@2026' });
     fixture.destroy();
-    expect(component.resetForm.controls.newPin.value).toBe('');
+    expect(component.resetForm.controls.newPassword.value).toBe('');
   });
 });

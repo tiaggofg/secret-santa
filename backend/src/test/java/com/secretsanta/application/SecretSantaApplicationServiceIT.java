@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.secretsanta.application.SecretSantaApplicationService.AdminGroupView;
+import com.secretsanta.application.SecretSantaApplicationService.AuthSessionResult;
 import com.secretsanta.application.SecretSantaApplicationService.AuthSessionView;
 import com.secretsanta.application.SecretSantaApplicationService.GroupDiscoveryView;
 import com.secretsanta.application.SecretSantaApplicationService.ParticipantRegistrationView;
@@ -22,14 +23,18 @@ import com.secretsanta.domain.exception.InvalidInviteSignatureException;
 import com.secretsanta.domain.exception.InvalidPasswordResetTokenException;
 import com.secretsanta.domain.exception.UnauthorizedOrganizerAccessException;
 import com.secretsanta.domain.model.GroupStatus;
+import com.secretsanta.domain.model.ParticipantName;
+import com.secretsanta.domain.model.PinHash;
 import com.secretsanta.domain.model.RevealStatus;
 import com.secretsanta.domain.model.SecretSantaGroup;
 import com.secretsanta.domain.model.UserAccount;
 import com.secretsanta.domain.model.Username;
+import com.secretsanta.domain.port.RefreshTokenRepository;
 import com.secretsanta.domain.port.SecretSantaGroupRepository;
 import com.secretsanta.domain.port.UserAccountRepository;
 import com.secretsanta.domain.service.DerangementDrawService;
 import com.secretsanta.domain.service.HouseholdClusterService;
+import com.secretsanta.infrastructure.persistence.RefreshTokenDocument;
 import com.secretsanta.infrastructure.persistence.SecretSantaGroupDocument;
 import com.secretsanta.infrastructure.persistence.SecretSantaIndexesChangeUnit;
 import com.secretsanta.infrastructure.persistence.UserAccountDocument;
@@ -70,6 +75,9 @@ class SecretSantaApplicationServiceIT {
     private SecretSantaGroupRepository groupRepository;
 
     @Autowired
+    private RefreshTokenRepository refreshTokenRepository;
+
+    @Autowired
     private MongoTemplate mongoTemplate;
 
     @Autowired
@@ -82,6 +90,7 @@ class SecretSantaApplicationServiceIT {
     void setUp() {
         mongoTemplate.dropCollection(UserAccountDocument.class);
         mongoTemplate.dropCollection(SecretSantaGroupDocument.class);
+        mongoTemplate.dropCollection(RefreshTokenDocument.class);
         indexesChangeUnit.ensureIndexes();
     }
 
@@ -126,7 +135,7 @@ class SecretSantaApplicationServiceIT {
 
     @Test
     void shouldRegisterAndAuthenticateUserWithBcryptAndRejectDuplicateUsernameOrInvalidPin() {
-        AuthSessionView registered = applicationService.registerUser("Tiago Godoy", "  Tiago.Godoy ", "1234");
+        AuthSessionView registered = applicationService.registerUser("Tiago Godoy", "  Tiago.Godoy ", "Ab1!cd");
 
         assertThat(registered.userId()).isNotNull();
         assertThat(registered.name()).isEqualTo("Tiago Godoy");
@@ -135,31 +144,31 @@ class SecretSantaApplicationServiceIT {
 
         UserAccount persisted = userAccountRepository.findByUsername(new Username("tiago.godoy")).orElseThrow();
         assertThat(persisted.pinHash().value()).startsWith("$2");
-        assertThat(persisted.pinHash().value()).doesNotContain("1234");
+        assertThat(persisted.pinHash().value()).doesNotContain("Ab1!cd");
 
         // Duplicate username (case-insensitive)
-        assertThatThrownBy(() -> applicationService.registerUser("Outro Tiago", "TIAGO.GODOY", "5678"))
+        assertThatThrownBy(() -> applicationService.registerUser("Outro Tiago", "TIAGO.GODOY", "Cd2@ef"))
                 .isInstanceOf(DuplicateUsernameException.class);
 
         // Valid login
-        AuthSessionView loggedIn = applicationService.loginUser("TIAGO.GODOY", "1234");
+        AuthSessionView loggedIn = applicationService.loginUser("TIAGO.GODOY", "Ab1!cd");
         assertThat(loggedIn.userId()).isEqualTo(registered.userId());
         assertThat(loggedIn.username()).isEqualTo("tiago.godoy");
         assertThat(tokenService.parseAndValidate(loggedIn.token()).userId()).isEqualTo(registered.userId());
 
         // Wrong PIN or unknown username
-        assertThatThrownBy(() -> applicationService.loginUser("tiago.godoy", "9999"))
+        assertThatThrownBy(() -> applicationService.loginUser("tiago.godoy", "Xy9!zw"))
                 .isInstanceOf(InvalidCredentialsException.class);
-        assertThatThrownBy(() -> applicationService.loginUser("nao.existe", "1234"))
+        assertThatThrownBy(() -> applicationService.loginUser("nao.existe", "Ab1!cd"))
                 .isInstanceOf(InvalidCredentialsException.class);
     }
 
     @Test
     void shouldListOnlyMyGroupsWhereUserIsOrganizerOrParticipant() {
-        AuthSessionView alice = applicationService.registerUser("Alice", "alice", "1234");
-        AuthSessionView bob = applicationService.registerUser("Bob", "bob", "1234");
-        AuthSessionView carol = applicationService.registerUser("Carol", "carol", "1234");
-        AuthSessionView dave = applicationService.registerUser("Dave", "dave", "1234");
+        AuthSessionView alice = applicationService.registerUser("Alice", "alice", "Ab1!cd");
+        AuthSessionView bob = applicationService.registerUser("Bob", "bob", "Ab1!cd");
+        AuthSessionView carol = applicationService.registerUser("Carol", "carol", "Ab1!cd");
+        AuthSessionView dave = applicationService.registerUser("Dave", "dave", "Ab1!cd");
 
         // Group 1: Alice is organizer and participant (no inviteSignature needed for organizer)
         AdminGroupView group1 = applicationService.createGroup(alice.userId(), "Natal Família Alice");
@@ -189,8 +198,8 @@ class SecretSantaApplicationServiceIT {
 
     @Test
     void shouldEnforceOrganizerPermissionOnAdminOperations() {
-        AuthSessionView organizer = applicationService.registerUser("Organizador", "org.user", "1234");
-        AuthSessionView intruder = applicationService.registerUser("Intruso", "intruder.user", "1234");
+        AuthSessionView organizer = applicationService.registerUser("Organizador", "org.user", "Ab1!cd");
+        AuthSessionView intruder = applicationService.registerUser("Intruso", "intruder.user", "Ab1!cd");
 
         AdminGroupView group = applicationService.createGroup(organizer.userId(), "Natal Protegido");
         ParticipantRegistrationView joined = applicationService.registerParticipant(
@@ -218,8 +227,8 @@ class SecretSantaApplicationServiceIT {
 
     @Test
     void shouldRetryParticipantRegistrationOnOptimisticLockingFailureAndSucceed() {
-        AuthSessionView organizer = applicationService.registerUser("Org", "org.retry", "1234");
-        AuthSessionView member = applicationService.registerUser("Membro", "membro.retry", "1234");
+        AuthSessionView organizer = applicationService.registerUser("Org", "org.retry", "Ab1!cd");
+        AuthSessionView member = applicationService.registerUser("Membro", "membro.retry", "Ab1!cd");
         AdminGroupView group = applicationService.createGroup(organizer.userId(), "Grupo Retry Otimista");
         String sig = extractSig(group);
 
@@ -263,10 +272,10 @@ class SecretSantaApplicationServiceIT {
 
     @Test
     void shouldRemoveParticipantWhileOpenAndRejectWhenDrawn() {
-        AuthSessionView u1 = applicationService.registerUser("U1", "user.one", "1234");
-        AuthSessionView u2 = applicationService.registerUser("U2", "user.two", "1234");
-        AuthSessionView u3 = applicationService.registerUser("U3", "user.three", "1234");
-        AuthSessionView u4 = applicationService.registerUser("U4", "user.four", "1234");
+        AuthSessionView u1 = applicationService.registerUser("U1", "user.one", "Ab1!cd");
+        AuthSessionView u2 = applicationService.registerUser("U2", "user.two", "Ab1!cd");
+        AuthSessionView u3 = applicationService.registerUser("U3", "user.three", "Ab1!cd");
+        AuthSessionView u4 = applicationService.registerUser("U4", "user.four", "Ab1!cd");
 
         AdminGroupView group = applicationService.createGroup(u1.userId(), "Natal Exclusão");
         String sig = extractSig(group);
@@ -291,9 +300,9 @@ class SecretSantaApplicationServiceIT {
 
     @Test
     void shouldExecuteDrawRevealMatchWithPinAndMarkRevealedStatus() {
-        AuthSessionView ana = applicationService.registerUser("Ana", "ana", "1111");
-        AuthSessionView bia = applicationService.registerUser("Bia", "bia", "2222");
-        AuthSessionView caio = applicationService.registerUser("Caio", "caio", "3333");
+        AuthSessionView ana = applicationService.registerUser("Ana", "ana", "Aa1!bb");
+        AuthSessionView bia = applicationService.registerUser("Bia", "bia", "Bb2@cc");
+        AuthSessionView caio = applicationService.registerUser("Caio", "caio", "Cc3#dd");
 
         AdminGroupView group = applicationService.createGroup(ana.userId(), "Natal Revelação");
         String sig = extractSig(group);
@@ -302,7 +311,7 @@ class SecretSantaApplicationServiceIT {
         applicationService.registerParticipant(group.id(), caio.userId(), sig, -23.4800, -51.9800);
 
         // Reveal while OPEN must fail with GroupNotDrawnYetException
-        assertThatThrownBy(() -> applicationService.revealMatch(group.id(), "ana", "1111"))
+        assertThatThrownBy(() -> applicationService.revealMatch(group.id(), "ana", "Aa1!bb"))
                 .isInstanceOf(GroupNotDrawnYetException.class);
 
         AdminGroupView drawnGroup = applicationService.executeDraw(group.id(), ana.userId());
@@ -312,13 +321,13 @@ class SecretSantaApplicationServiceIT {
                 .allSatisfy(p -> assertThat(p.revealStatus()).isEqualTo(RevealStatus.PENDING_REVEAL));
 
         // Wrong PIN or non-participant username must fail with InvalidCredentialsException
-        assertThatThrownBy(() -> applicationService.revealMatch(group.id(), "ana", "9999"))
+        assertThatThrownBy(() -> applicationService.revealMatch(group.id(), "ana", "Xy9!zw"))
                 .isInstanceOf(InvalidCredentialsException.class);
-        assertThatThrownBy(() -> applicationService.revealMatch(group.id(), "desconhecido", "1111"))
+        assertThatThrownBy(() -> applicationService.revealMatch(group.id(), "desconhecido", "Aa1!bb"))
                 .isInstanceOf(InvalidCredentialsException.class);
 
         // Valid reveal
-        RevealMatchView reveal = applicationService.revealMatch(group.id(), "ANA", "1111");
+        RevealMatchView reveal = applicationService.revealMatch(group.id(), "ANA", "Aa1!bb");
         assertThat(reveal.username()).isEqualTo("ana");
         assertThat(reveal.drawnParticipantName()).isIn("Bia", "Caio");
         assertThat(reveal.revealedAt()).isNotNull();
@@ -344,8 +353,8 @@ class SecretSantaApplicationServiceIT {
                 new BCryptPasswordEncoder(),
                 Clock.fixed(baseTime, ZoneOffset.UTC));
 
-        AuthSessionView org = timeControlledService.registerUser("Organizador", "org.reset", "1234");
-        AuthSessionView lucas = timeControlledService.registerUser("Lucas", "lucas.silva", "1111");
+        AuthSessionView org = timeControlledService.registerUser("Organizador", "org.reset", "Ab1!cd");
+        AuthSessionView lucas = timeControlledService.registerUser("Lucas", "lucas.silva", "Aa1!bb");
 
         AdminGroupView group = timeControlledService.createGroup(org.userId(), "Natal Reset PIN");
         ParticipantRegistrationView lucasParticipant = timeControlledService.registerParticipant(
@@ -359,16 +368,16 @@ class SecretSantaApplicationServiceIT {
         assertThat(resetLink.expiresAt()).isEqualTo(baseTime.plus(Duration.ofHours(24)));
 
         // Consume one-time token to set new PIN
-        timeControlledService.resetPinWithToken(resetLink.resetToken(), "654321");
+        timeControlledService.resetPinWithToken(resetLink.resetToken(), "Zz9!yy");
 
         // Second use of the same token must fail immediately
-        assertThatThrownBy(() -> timeControlledService.resetPinWithToken(resetLink.resetToken(), "1122"))
+        assertThatThrownBy(() -> timeControlledService.resetPinWithToken(resetLink.resetToken(), "Ww8@vv"))
                 .isInstanceOf(InvalidPasswordResetTokenException.class);
 
         // Old PIN no longer works; new PIN works
-        assertThatThrownBy(() -> timeControlledService.loginUser("lucas.silva", "1111"))
+        assertThatThrownBy(() -> timeControlledService.loginUser("lucas.silva", "Aa1!bb"))
                 .isInstanceOf(InvalidCredentialsException.class);
-        AuthSessionView relogin = timeControlledService.loginUser("lucas.silva", "654321");
+        AuthSessionView relogin = timeControlledService.loginUser("lucas.silva", "Zz9!yy");
         assertThat(relogin.userId()).isEqualTo(lucas.userId());
     }
 
@@ -398,9 +407,9 @@ class SecretSantaApplicationServiceIT {
                     .doesNotContainAnyElementsOf(forbiddenFields);
         }
 
-        AuthSessionView u1 = applicationService.registerUser("P1", "p1.sec", "1234");
-        AuthSessionView u2 = applicationService.registerUser("P2", "p2.sec", "2345");
-        AuthSessionView u3 = applicationService.registerUser("P3", "p3.sec", "3456");
+        AuthSessionView u1 = applicationService.registerUser("P1", "p1.sec", "Ab1!cd");
+        AuthSessionView u2 = applicationService.registerUser("P2", "p2.sec", "Ee5%ff");
+        AuthSessionView u3 = applicationService.registerUser("P3", "p3.sec", "Ff6^gg");
 
         AdminGroupView group = applicationService.createGroup(u1.userId(), "Grupo Sigilo");
         String sig = extractSig(group);
@@ -421,7 +430,7 @@ class SecretSantaApplicationServiceIT {
 
     @Test
     void shouldSupportDirectVisitorRegistrationWithValidInviteSignatureAndAvoidOrphanUserOnInvalidSignature() {
-        AuthSessionView org = applicationService.registerUser("Organizador", "org.whats", "1234");
+        AuthSessionView org = applicationService.registerUser("Organizador", "org.whats", "Ab1!cd");
         AdminGroupView group = applicationService.createGroup(org.userId(), "Grupo Link WhatsApp");
         String sig = extractSig(group);
 
@@ -430,7 +439,7 @@ class SecretSantaApplicationServiceIT {
                         group.id(),
                         "Orphan User",
                         "orphan.user",
-                        "4321",
+                        "Dd4$ee",
                         "invalid_signature_1234567890",
                         -23.42,
                         -51.93))
@@ -438,19 +447,21 @@ class SecretSantaApplicationServiceIT {
 
         assertThat(userAccountRepository.findByUsername(new Username("orphan.user"))).isEmpty();
 
-        ParticipantRegistrationView joinedVisitor = applicationService.registerVisitorAndJoinGroup(
+        var joinResult = applicationService.registerVisitorAndJoinGroupWithTokens(
                 group.id(),
                 "Tia Maria",
                 "tia.maria",
-                "4321",
+                "Dd4$ee",
                 sig,
                 -23.42,
                 -51.93);
+        ParticipantRegistrationView joinedVisitor = joinResult.participant();
 
         assertThat(joinedVisitor.name()).isEqualTo("Tia Maria");
         assertThat(joinedVisitor.username()).isEqualTo("tia.maria");
         assertThat(joinedVisitor.hasGeoLocation()).isTrue();
-        assertThat(joinedVisitor.token()).isNotBlank();
+        assertThat(joinResult.accessToken()).isNotBlank();
+        assertThat(joinResult.refreshToken()).isNotBlank();
 
         // Trying to join the same group again must fail with DuplicateParticipantException
         assertThatThrownBy(() -> applicationService.registerParticipant(
@@ -460,8 +471,8 @@ class SecretSantaApplicationServiceIT {
 
     @Test
     void shouldRotateInviteSignatureInvalidatingPreviousLinkImmediately() {
-        AuthSessionView org = applicationService.registerUser("Organizador", "org.rot", "1234");
-        AuthSessionView guest = applicationService.registerUser("Convidado", "guest.rot", "1234");
+        AuthSessionView org = applicationService.registerUser("Organizador", "org.rot", "Ab1!cd");
+        AuthSessionView guest = applicationService.registerUser("Convidado", "guest.rot", "Ab1!cd");
 
         AdminGroupView created = applicationService.createGroup(org.userId(), "Grupo Rotação");
         String oldSig = extractSig(created);
@@ -482,5 +493,63 @@ class SecretSantaApplicationServiceIT {
         ParticipantRegistrationView joined = applicationService.registerParticipant(
                 created.id(), guest.userId(), newSig, null, null);
         assertThat(joined.userId()).isEqualTo(guest.userId());
+    }
+
+    @Test
+    void shouldRotateRefreshTokensDetectReuseRevokeOnLogoutAndSupportLegacyPinHashes() {
+        AuthSessionResult registered = applicationService.registerUserWithTokens("Ana Paula", "ana.paula", "Ab1!cd");
+        assertThat(registered.accessToken()).isNotBlank();
+        assertThat(registered.refreshToken()).isNotBlank();
+
+        // Rotate refresh token
+        AuthSessionResult rotated = applicationService.refreshSession(registered.refreshToken());
+        assertThat(rotated.userId()).isEqualTo(registered.userId());
+        assertThat(rotated.refreshToken()).isNotEqualTo(registered.refreshToken());
+
+        // Reusing old revoked refresh token must revoke entire family and fail
+        assertThatThrownBy(() -> applicationService.refreshSession(registered.refreshToken()))
+                .isInstanceOf(InvalidCredentialsException.class);
+        assertThatThrownBy(() -> applicationService.refreshSession(rotated.refreshToken()))
+                .isInstanceOf(InvalidCredentialsException.class);
+
+        // New login + logout revokes refresh token
+        AuthSessionResult relogin = applicationService.loginUserWithTokens("ana.paula", "Ab1!cd");
+        applicationService.logoutSession(relogin.refreshToken());
+        assertThatThrownBy(() -> applicationService.refreshSession(relogin.refreshToken()))
+                .isInstanceOf(InvalidCredentialsException.class);
+
+        // Legacy 4-digit numeric PIN hash stored in MongoDB still works for login & reveal
+        BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
+        UserAccount legacyUser = UserAccount.register(
+                new ParticipantName("Vovó Maria"),
+                new Username("vovo.maria"),
+                new PinHash(encoder.encode("1950")),
+                Instant.now());
+        userAccountRepository.save(legacyUser);
+        AuthSessionResult legacySession = applicationService.loginUserWithTokens("vovo.maria", "1950");
+        assertThat(legacySession.userId()).isEqualTo(legacyUser.id());
+    }
+
+    @Test
+    void shouldThrowAlreadyParticipantAuthenticatedExceptionWithTokensEvenAfterInviteRotation() {
+        AuthSessionView org = applicationService.registerUser("Organizador", "org.rejoin", "Ab1!cd");
+        AuthSessionView member = applicationService.registerUser("Membro", "membro.rejoin", "Bb2@cc");
+        AdminGroupView group = applicationService.createGroup(org.userId(), "Grupo Rejoin");
+        String initialSig = extractSig(group);
+        applicationService.registerParticipant(group.id(), member.userId(), initialSig, null, null);
+
+        // Rotate invite link
+        applicationService.rotateInviteSignature(group.id(), org.userId());
+
+        // Already-joined user logs in via visitor flow with old/missing sig -> throws AlreadyParticipantAuthenticatedException with valid tokens
+        assertThatThrownBy(() -> applicationService.registerVisitorAndJoinGroupWithTokens(
+                        group.id(), null, "membro.rejoin", "Bb2@cc", initialSig, null, null))
+                .isInstanceOfSatisfying(AlreadyParticipantAuthenticatedException.class, ex -> {
+                    assertThat(ex.userId()).isEqualTo(member.userId());
+                    assertThat(ex.groupId()).isEqualTo(group.id());
+                    assertThat(ex.accessToken()).isNotBlank();
+                    assertThat(ex.refreshToken()).isNotBlank();
+                    assertThat(tokenService.parseAndValidate(ex.accessToken()).userId()).isEqualTo(member.userId());
+                });
     }
 }

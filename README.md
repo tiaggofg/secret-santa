@@ -6,11 +6,11 @@ Aplicação web **Mobile-First** para organização e sorteio de **Amigo Secreto
 
 ## ✨ Principais Funcionalidades
 
-- **Identidade Simples por PIN**: Cadastro único com nome, nome de usuário (normalizado em minúsculas) e PIN numérico de 4 a 6 dígitos protegido com hash **BCrypt**.
+- **Identidade com Senha Forte**: Cadastro único com nome, nome de usuário (normalizado em minúsculas) e senha forte de 6 a 64 caracteres (maiúscula, minúscula, número e caractere especial, sem espaços) protegida com hash **BCrypt** (com retrocompatibilidade para contas legadas).
 - **Grupos Privados com Convite Assinado**: Cada grupo possui um `UUID` e uma assinatura criptográfica **HMAC-SHA256** persistida (`?sig=...`). Somente quem possui o link completo pode visualizar os participantes e ingressar — com suporte a **rotação do link de convite** pelo organizador.
-- **Organizador sem Senha Extra**: Quem cria o grupo torna-se automaticamente o organizador (`organizerUserId`), com acesso ao painel administrativo (`/g/{groupId}/admin`) para remover participantes, executar o sorteio, rotacionar o convite e gerar links únicos de redefinição de PIN (`/reset/{token}`).
+- **Organizador sem Senha Extra**: Quem cria o grupo torna-se automaticamente o organizador (`organizerUserId`), com acesso ao painel administrativo (`/g/{groupId}/admin`) para remover participantes, executar o sorteio, rotacionar o convite e gerar links únicos de redefinição de senha (`/reset/{token}`).
 - **Restrição Geográfica de Residência (`<= 50m`)**: Agrupamento automático de participantes por proximidade GPS usando a **fórmula de Haversine** e **Union-Find** (`<= 50 metros`). O algoritmo garante que moradores da mesma casa não tirem uns aos outros sempre que matematicamente possível (`tamanho_max_nucleo <= floor(N / 2)`), aplicando relaxamento automático apenas quando uma mesma residência concentra mais da metade do grupo.
-- **Sigilo Efêmero & Modo "Passar o Celular"**: O nome sorteado, o PIN e o token de sessão ficam **exclusivamente em memória volátil** (Angular Signals) — nunca em `localStorage`, `sessionStorage`, `IndexedDB`, cookies ou URL. O resultado é limpo ao fechar o modal, ao trocar de usuário ou ao ocultar a aba (`visibilitychange`).
+- **Sessão Segura em Cookies `HttpOnly` & Modo "Passar o Celular"**: Access Token curto (`15 min`) e Refresh Token opaco (`1h` deslizante com rotação e detecção de reuso no MongoDB) trafegados exclusivamente em cookies `HttpOnly`. O nome sorteado (`drawnParticipantName`) e a senha digitada na revelação ficam **exclusivamente em memória volátil** (Angular Signals) — nunca em `localStorage`, `sessionStorage`, `IndexedDB` ou URL. O resultado é limpo ao fechar o modal, ao trocar/sair (`POST /api/v1/auth/logout`) ou ao ocultar a aba (`visibilitychange`).
 - **Compartilhamento Direto no WhatsApp**: Integração com Web Share API nativa (`navigator.share`), fallback para área de transferência e abertura direta via `wa.me` no desktop.
 
 ---
@@ -21,8 +21,8 @@ Aplicação web **Mobile-First** para organização e sorteio de **Amigo Secreto
 flowchart LR
     User["Participante / Organizador<br/>(Celular ou Desktop)"] -->|"HTTPS (SPA Angular 19)"| FE["Frontend Web<br/>(Vercel)"]
     User -.->|"Compartilha link /g/id?sig=..."| WA["WhatsApp"]
-    FE -->|"REST JSON /api/v1<br/>Bearer HMAC-SHA256"| BE["Backend API<br/>(Java 25 + Spring Boot 3.5)"]
-    BE -->|"Spring Data + Mongock"| DB[("MongoDB 7.0<br/>users & secret_santa_groups")]
+    FE -->|"REST JSON /api/v1<br/>Cookies HttpOnly (Access + Refresh)"| BE["Backend API<br/>(Java 25 + Spring Boot 3.5)"]
+    BE -->|"Spring Data + Mongock"| DB[("MongoDB 7.0<br/>users, groups & refresh_tokens")]
 ```
 
 ---
@@ -110,8 +110,11 @@ cd frontend && npm run build
 | Variável | Descrição | Padrão (Dev) |
 | :--- | :--- | :--- |
 | `MONGODB_URI` | String de conexão do MongoDB | `mongodb://localhost:27017/secret_santa` |
-| `SECRETSANTA_TOKEN_SECRET` | Segredo HMAC-SHA256 (>= 32 caracteres) para sessão e convites | Chave padrão de desenvolvimento |
-| `CORS_ALLOWED_ORIGINS` | Origens permitidas no CORS | `*` |
+| `SECRETSANTA_TOKEN_SECRET` | Segredo HMAC-SHA256 (>= 32 caracteres) para access tokens e convites | Chave padrão de desenvolvimento |
+| `CORS_ALLOWED_ORIGINS` | Origens permitidas no CORS (com `allowCredentials=true`) | `http://localhost:4200` |
+| `SECRETSANTA_COOKIE_SECURE` | Override opcional para flag `Secure` dos cookies (auto via `X-Forwarded-Proto`) | Auto-detectado |
+| `SECRETSANTA_COOKIE_SAME_SITE` | Atributo `SameSite` dos cookies de sessão | `Lax` |
+| `SECRETSANTA_COOKIE_DOMAIN` | Domínio opcional dos cookies de sessão | Host-only (vazio) |
 | `BACKEND_PORT` | Porta exposta no container de produção | `8080` |
 
 ### Frontend ([set-env.mjs](file:///home/tiago.godoy@db1.com.br/workspace/tiaggofg/secret-santa/frontend/scripts/set-env.mjs))

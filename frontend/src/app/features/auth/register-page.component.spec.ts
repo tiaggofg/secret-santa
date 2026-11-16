@@ -38,10 +38,9 @@ describe('RegisterPageComponent', () => {
     fixture.detectChanges();
   });
 
-  it('auto-suggests username from name, submits with Concluir cadastro, stores session and navigates to /', () => {
+  it('auto-suggests username from name, submits strong password, stores session and navigates to /', () => {
     apiMock.register.mockReturnValue(
       of({
-        token: 'tok-reg',
         userId: 'u-1',
         name: 'Maria Clara',
         username: 'maria.clara'
@@ -55,10 +54,12 @@ describe('RegisterPageComponent', () => {
 
     expect(component.registerForm.controls.username.value).toBe('maria.clara');
 
-    const pinInput: HTMLInputElement = fixture.nativeElement.querySelector('#reg-pin');
-    pinInput.value = '1234';
-    pinInput.dispatchEvent(new Event('input'));
+    const passwordInput: HTMLInputElement = fixture.nativeElement.querySelector('#reg-password');
+    passwordInput.value = 'Natal@2026';
+    passwordInput.dispatchEvent(new Event('input'));
     fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('[data-testid="password-criteria-indicator"]')).toBeTruthy();
 
     const submitBtn: HTMLButtonElement = fixture.nativeElement.querySelector('[data-testid="register-submit"]');
     expect(submitBtn.textContent).toContain('Concluir cadastro');
@@ -71,7 +72,7 @@ describe('RegisterPageComponent', () => {
     expect(apiMock.register).toHaveBeenCalledWith({
       name: 'Maria Clara',
       username: 'maria.clara',
-      pin: '1234'
+      password: 'Natal@2026'
     });
     expect(authStore.isAuthenticated()).toBe(true);
     expect(router.navigateByUrl).toHaveBeenCalledWith('/');
@@ -85,7 +86,7 @@ describe('RegisterPageComponent', () => {
     component.registerForm.setValue({
       name: 'Maria Silva',
       username: 'maria.silva',
-      pin: '1234'
+      password: 'Natal@2026'
     });
     component.submitRegister();
     fixture.detectChanges();

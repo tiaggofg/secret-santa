@@ -151,4 +151,52 @@ class ValueObjectsTest {
         assertThat(RevealStatus.valueOf("PENDING_REVEAL")).isEqualTo(RevealStatus.PENDING_REVEAL);
         assertThat(RevealStatus.valueOf("REVEALED")).isEqualTo(RevealStatus.REVEALED);
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"Ab1!cd", "Natal@2026", "S3nha#Forte_01", "P@ssw0rd!" + "1234567890"})
+    void passwordValidatorShouldAcceptStrongPasswords(String validPassword) {
+        PasswordValidator.validateRawPassword(validPassword);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "",
+        "Ab1!c",
+        "abcdef1!",
+        "ABCDEF1!",
+        "Abcdef!!",
+        "Abcdef12",
+        "Ab1! cd",
+        "Ab1!\tcd",
+        "Ab1!\ncd"
+    })
+    void passwordValidatorShouldRejectWeakOrInvalidPasswords(String invalidPassword) {
+        assertThatThrownBy(() -> PasswordValidator.validateRawPassword(invalidPassword))
+                .isInstanceOf(DomainValidationException.class);
+    }
+
+    @Test
+    void passwordValidatorShouldRejectNullAndTooLongPasswords() {
+        assertThatThrownBy(() -> PasswordValidator.validateRawPassword(null))
+                .isInstanceOf(DomainValidationException.class);
+        assertThatThrownBy(() -> PasswordValidator.validateRawPassword("Aa1!" + "x".repeat(61)))
+                .isInstanceOf(DomainValidationException.class);
+    }
+
+    @Test
+    void refreshTokenShouldCheckExpirationAndRevocationAndMaskToString() {
+        java.time.Instant now = java.time.Instant.parse("2026-11-16T12:00:00Z");
+        java.util.UUID userId = java.util.UUID.randomUUID();
+        java.util.UUID familyId = java.util.UUID.randomUUID();
+
+        RefreshToken token = RefreshToken.issue(userId, familyId, "sha256-secret-hash", now.plusSeconds(3600), now);
+        assertThat(token.isRevoked()).isFalse();
+        assertThat(token.isExpired(now.plusSeconds(3599))).isFalse();
+        assertThat(token.isExpired(now.plusSeconds(3600))).isTrue();
+        assertThat(token.toString()).doesNotContain("sha256-secret-hash");
+
+        RefreshToken revoked = token.revoke(now.plusSeconds(60));
+        assertThat(revoked.isRevoked()).isTrue();
+        assertThat(revoked.revokedAt()).isEqualTo(now.plusSeconds(60));
+    }
 }
