@@ -10,7 +10,11 @@ RUN mvn clean package -DskipTests -B
 FROM eclipse-temurin:25-jre
 WORKDIR /app
 
-RUN groupadd --system appgroup && useradd --system --gid appgroup appuser
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system appgroup \
+    && useradd --system --gid appgroup appuser
 COPY --from=build /app/target/*.jar app.jar
 RUN chown appuser:appgroup app.jar
 
