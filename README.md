@@ -140,6 +140,13 @@ secret-santa/
 ├── docs/                   # Documentação técnica e diagramas Mermaid
 ├── frontend/               # SPA Angular 19 + Tailwind CSS + Vitest
 ├── AGENTS.md               # Diretrizes e regras operacionais para agentes de IA
+├── LICENSE                 # Licença Apache-2.0
 ├── docker-compose.yml      # MongoDB 7.0 local
 └── docker-compose.prod.yml # Stack de produção (imagem GHCR + healthcheck)
 ```
+
+---
+
+## 📄 Licença
+
+Este projeto está licenciado sob a licença **Apache License 2.0** — veja o arquivo [LICENSE](LICENSE) para mais detalhes.
