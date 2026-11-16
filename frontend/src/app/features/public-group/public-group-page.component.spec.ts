@@ -16,8 +16,9 @@ describe('PublicGroupPageComponent', () => {
   let authStore: AuthSessionStore;
 
   const groupId = '11111111-1111-1111-1111-111111111111';
+  const validSig = 'sig_valid_hmac_signature_123456';
 
-  const openHiddenParticipantsGroupMock: PublicGroupView = {
+  const openValidInviteGroupMock: PublicGroupView = {
     id: groupId,
     eventName: 'Natal Família Silva',
     organizerUserId: 'org-1',
@@ -26,6 +27,7 @@ describe('PublicGroupPageComponent', () => {
     sharePath: `/g/${groupId}`,
     organizer: false,
     joined: false,
+    inviteValid: true,
     participantsVisible: false,
     participantCount: 1,
     createdAt: '2026-11-13T18:00:00Z',
@@ -34,9 +36,10 @@ describe('PublicGroupPageComponent', () => {
   };
 
   const drawnVisibleGroupMock: PublicGroupView = {
-    ...openHiddenParticipantsGroupMock,
+    ...openValidInviteGroupMock,
     status: 'DRAWN',
     joined: true,
+    inviteValid: true,
     participantsVisible: true,
     participantCount: 2,
     drawnAt: '2026-11-13T19:00:00Z',
@@ -74,7 +77,7 @@ describe('PublicGroupPageComponent', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    apiMock.getPublicGroup.mockReturnValue(of(openHiddenParticipantsGroupMock));
+    apiMock.getPublicGroup.mockReturnValue(of(openValidInviteGroupMock));
     geoServiceMock.captureCoordinatesForJoin.mockResolvedValue({
       latitude: -23.5505,
       longitude: -46.6333,
@@ -92,7 +95,8 @@ describe('PublicGroupPageComponent', () => {
           provide: ActivatedRoute,
           useValue: {
             snapshot: {
-              paramMap: convertToParamMap({ groupId })
+              paramMap: convertToParamMap({ groupId }),
+              queryParamMap: convertToParamMap({ sig: validSig })
             }
           }
         },
@@ -107,9 +111,11 @@ describe('PublicGroupPageComponent', () => {
     fixture.detectChanges();
   });
 
-  it('opens on visitor login without tablist, hides participant list for non-members and switches to inline register with Continuar button', async () => {
+  it('opens on visitor login when inviteValid is true, hides participant list for non-members and switches to inline register without groupPin', async () => {
+    expect(apiMock.getPublicGroup).toHaveBeenCalledWith(groupId, validSig);
     expect(fixture.nativeElement.querySelector('[role="tablist"]')).toBeNull();
     expect(fixture.nativeElement.querySelector('[data-testid="visitor-login-form"]')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="visitor-group-pin-input"]')).toBeNull();
     expect(fixture.nativeElement.querySelector('[data-testid="public-participants-list"]')).toBeNull();
     expect(fixture.nativeElement.querySelector('[data-testid="private-participants-notice"]')).not.toBeNull();
     expect(fixture.nativeElement.textContent.toLowerCase()).not.toContain('username');
@@ -148,7 +154,6 @@ describe('PublicGroupPageComponent', () => {
     expect(component.visitorRegisterForm.controls.username.value).toBe('joaozinho.silva');
 
     component.visitorRegisterForm.controls.pin.setValue('1234');
-    component.visitorRegisterForm.controls.groupPin.setValue('5678');
 
     const form: HTMLFormElement = fixture.nativeElement.querySelector('[data-testid="visitor-register-form"]');
     form.dispatchEvent(new Event('submit'));
@@ -159,51 +164,66 @@ describe('PublicGroupPageComponent', () => {
       name: 'Joãozinho Silva',
       username: 'joaozinho.silva',
       pin: '1234',
-      groupPin: '5678',
+      inviteSignature: validSig,
       latitude: -23.5505,
       longitude: -46.6333
     });
     expect(authStore.isAuthenticated()).toBe(true);
   });
 
-  it('shows 403 error message when visitor enters wrong groupPin', async () => {
+  it('blocks registration and displays invalid-invite-notice when inviteValid is false and user is not organizer', () => {
+    component.group.set({
+      ...openValidInviteGroupMock,
+      inviteValid: false,
+      organizer: false,
+      joined: false
+    });
+    fixture.detectChanges();
+
+    const notice = fixture.nativeElement.querySelector('[data-testid="invalid-invite-notice"]');
+    expect(notice).not.toBeNull();
+    expect(notice?.textContent).toContain(
+      'Este grupo é privado. Para participar, acesse através do link de convite oficial enviado pelo organizador.'
+    );
+    expect(fixture.nativeElement.querySelector('[data-testid="visitor-login-form"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="authenticated-join-btn"]')).toBeNull();
+  });
+
+  it('shows 403 error message when invite link is invalid or rotated during join attempt', async () => {
     apiMock.joinGroup.mockReturnValue(
       throwError(() => new HttpErrorResponse({ status: 403, statusText: 'Forbidden' }))
     );
 
     component.visitorLoginForm.setValue({
       username: 'maria.silva',
-      pin: '1234',
-      groupPin: '0000'
+      pin: '1234'
     });
     await component.submitVisitorLoginAndJoin();
     fixture.detectChanges();
 
     const alert = fixture.nativeElement.querySelector('[data-testid="public-group-error"]');
-    expect(alert?.textContent).toContain('PIN do grupo incorreto');
+    expect(alert?.textContent).toContain('Link de convite inválido ou expirado');
   });
 
-  it('displays greeting without @username and requires groupPin for non-organizer authenticated user, but bypasses groupPin for organizer', async () => {
+  it('displays greeting without @username and sends inviteSignature for non-organizer authenticated user, bypassing signature for organizer', async () => {
     authStore.setSession({
       token: 'tok-auth',
       userId: 'u-55',
       name: 'Pedro Silva',
       username: 'pedro.silva'
     });
-    component.group.set({ ...openHiddenParticipantsGroupMock, organizer: false, joined: false });
+    component.group.set({ ...openValidInviteGroupMock, organizer: false, joined: false, inviteValid: true });
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain(
       'Olá, Pedro Silva. Toque abaixo para confirmar sua participação neste grupo:'
     );
     expect(fixture.nativeElement.textContent).not.toContain('@pedro.silva');
-    expect(fixture.nativeElement.querySelector('[data-testid="public-switch-family-user-btn"]')).toBeNull();
-    expect(fixture.nativeElement.querySelector('[data-testid="authenticated-group-pin-input"]')).not.toBeNull();
-
-    // Organizer bypasses groupPin
-    component.group.set({ ...openHiddenParticipantsGroupMock, organizer: true, joined: false });
-    fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('[data-testid="authenticated-group-pin-input"]')).toBeNull();
+
+    // Organizer bypasses inviteSignature
+    component.group.set({ ...openValidInviteGroupMock, organizer: true, joined: false, inviteValid: true });
+    fixture.detectChanges();
 
     apiMock.joinGroup.mockReturnValue(
       of({
@@ -228,17 +248,18 @@ describe('PublicGroupPageComponent', () => {
     fixture.detectChanges();
 
     expect(apiMock.joinGroup).toHaveBeenCalledWith(groupId, {
-      groupPin: undefined,
+      inviteSignature: undefined,
       latitude: -23.5505,
       longitude: -46.6333
     });
   });
 
-  it('displays reveal form even when participants are hidden in DRAWN state, and pre-fills when visible', () => {
+  it('displays reveal form even when inviteValid is false and participants are hidden in DRAWN state, and pre-fills when visible', () => {
     apiMock.getPublicGroup.mockReturnValue(
       of({
-        ...openHiddenParticipantsGroupMock,
+        ...openValidInviteGroupMock,
         status: 'DRAWN',
+        inviteValid: false,
         participantsVisible: false,
         participants: []
       })

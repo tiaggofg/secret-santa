@@ -121,6 +121,29 @@ class ValueObjectsTest {
     }
 
     @Test
+    void inviteSignatureShouldValidateFormatMaskToStringAndMatchInConstantTime() {
+        InviteSignature sig = new InviteSignature("  AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-AaBb  ");
+        assertThat(sig.value()).isEqualTo("AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-AaBb");
+        assertThat(sig.toString()).isEqualTo("InviteSignature[PROTECTED]");
+        assertThat(sig.toString()).doesNotContain("AbCdEf");
+
+        assertThat(sig.matchesConstantTime("AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-AaBb")).isTrue();
+        assertThat(sig.matchesConstantTime("  AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-AaBb  ")).isTrue();
+        assertThat(sig.matchesConstantTime("AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-AaBc")).isFalse();
+        assertThat(sig.matchesConstantTime(null)).isFalse();
+        assertThat(sig.matchesConstantTime("   ")).isFalse();
+
+        assertThatThrownBy(() -> new InviteSignature(null))
+                .isInstanceOf(DomainValidationException.class);
+        assertThatThrownBy(() -> new InviteSignature("   "))
+                .isInstanceOf(DomainValidationException.class);
+        assertThatThrownBy(() -> new InviteSignature("short123"))
+                .isInstanceOf(DomainValidationException.class);
+        assertThatThrownBy(() -> new InviteSignature("invalid+char/with=padding12345678"))
+                .isInstanceOf(DomainValidationException.class);
+    }
+
+    @Test
     void statusEnumsShouldResolveAllValues() {
         assertThat(GroupStatus.valueOf("OPEN")).isEqualTo(GroupStatus.OPEN);
         assertThat(GroupStatus.valueOf("DRAWN")).isEqualTo(GroupStatus.DRAWN);

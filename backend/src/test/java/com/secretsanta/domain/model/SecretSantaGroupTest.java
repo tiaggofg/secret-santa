@@ -18,28 +18,29 @@ import org.junit.jupiter.api.Test;
 class SecretSantaGroupTest {
 
     private static final Instant NOW = Instant.parse("2026-11-13T18:00:00Z");
-    private static final PinHash GROUP_PIN_HASH = new PinHash("$2a$10$groupPinHashValue");
+    private static final InviteSignature INVITE_SIGNATURE =
+            new InviteSignature("sig_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789");
 
     @Test
-    void shouldCreateGroupValidateEventNameAndEnforceOrganizerPermission() {
+    void shouldCreateGroupValidateEventNameRotateSignatureAndEnforceOrganizerPermission() {
         UUID organizerId = UUID.randomUUID();
         SecretSantaGroup group = SecretSantaGroup.create(
                 "  Natal Família Godoy  ",
-                GROUP_PIN_HASH,
+                INVITE_SIGNATURE,
                 organizerId,
                 NOW);
 
         assertThat(group.id()).isNotNull();
         assertThat(group.eventName()).isEqualTo("Natal Família Godoy");
-        assertThat(group.groupPinHash()).isEqualTo(GROUP_PIN_HASH);
+        assertThat(group.inviteSignature()).isEqualTo(INVITE_SIGNATURE);
         assertThat(group.organizerUserId()).isEqualTo(organizerId);
         assertThat(group.status()).isEqualTo(GroupStatus.OPEN);
         assertThat(group.geographicRestrictionRelaxed()).isFalse();
         assertThat(group.participants()).isEmpty();
 
-        PinHash updatedPinHash = new PinHash("$2a$10$newGroupPinHashValue");
-        group.updateGroupPinHash(updatedPinHash);
-        assertThat(group.groupPinHash()).isEqualTo(updatedPinHash);
+        InviteSignature rotatedSignature = new InviteSignature("sig_Rotated9876543210ZyXwVuTsRqPoNmLkJiHg");
+        group.rotateInviteSignature(rotatedSignature);
+        assertThat(group.inviteSignature()).isEqualTo(rotatedSignature);
 
         group.assertOrganizer(organizerId);
 
@@ -47,9 +48,9 @@ class SecretSantaGroupTest {
         assertThatThrownBy(() -> group.assertOrganizer(otherUserId))
                 .isInstanceOf(UnauthorizedOrganizerAccessException.class);
 
-        assertThatThrownBy(() -> SecretSantaGroup.create("ab", GROUP_PIN_HASH, organizerId, NOW))
+        assertThatThrownBy(() -> SecretSantaGroup.create("ab", INVITE_SIGNATURE, organizerId, NOW))
                 .isInstanceOf(DomainValidationException.class);
-        assertThatThrownBy(() -> SecretSantaGroup.create("a".repeat(101), GROUP_PIN_HASH, organizerId, NOW))
+        assertThatThrownBy(() -> SecretSantaGroup.create("a".repeat(101), INVITE_SIGNATURE, organizerId, NOW))
                 .isInstanceOf(DomainValidationException.class);
     }
 
@@ -58,7 +59,7 @@ class SecretSantaGroupTest {
         UUID organizerId = UUID.randomUUID();
         SecretSantaGroup group = SecretSantaGroup.create(
                 "Natal da Família",
-                GROUP_PIN_HASH,
+                INVITE_SIGNATURE,
                 organizerId,
                 NOW);
 
@@ -103,7 +104,7 @@ class SecretSantaGroupTest {
     void shouldRejectDrawWithFewerThanThreeParticipants() {
         SecretSantaGroup group = SecretSantaGroup.create(
                 "Natal Pequeno",
-                GROUP_PIN_HASH,
+                INVITE_SIGNATURE,
                 UUID.randomUUID(),
                 NOW);
 
@@ -118,7 +119,7 @@ class SecretSantaGroupTest {
     void shouldExecuteDrawLockGroupRevealDrawnNameAndProtectSecrecyInToString() {
         SecretSantaGroup group = SecretSantaGroup.create(
                 "Natal Completo",
-                GROUP_PIN_HASH,
+                INVITE_SIGNATURE,
                 UUID.randomUUID(),
                 NOW);
 

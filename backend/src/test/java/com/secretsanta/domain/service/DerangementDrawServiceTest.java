@@ -7,9 +7,9 @@ import com.secretsanta.domain.exception.InsufficientParticipantsForDrawException
 import com.secretsanta.domain.model.DrawResult;
 import com.secretsanta.domain.model.GeoCoordinates;
 import com.secretsanta.domain.model.GroupStatus;
+import com.secretsanta.domain.model.InviteSignature;
 import com.secretsanta.domain.model.Participant;
 import com.secretsanta.domain.model.ParticipantName;
-import com.secretsanta.domain.model.PinHash;
 import com.secretsanta.domain.model.SecretSantaGroup;
 import com.secretsanta.domain.model.Username;
 import java.time.Instant;
@@ -148,7 +148,7 @@ class DerangementDrawServiceTest {
     void shouldExecuteUniformDerangementWithRelaxedFalseWhenAllParticipantsDenyGps() {
         SecretSantaGroup group = SecretSantaGroup.create(
                 "Natal Sem GPS",
-                new PinHash("$2a$10$groupPinHash"),
+                new InviteSignature("sig_InviteSignatureForTest123456"),
                 UUID.randomUUID(),
                 NOW);
         group.registerParticipant(UUID.randomUUID(), new ParticipantName("Ana"), new Username("ana"), null, NOW);

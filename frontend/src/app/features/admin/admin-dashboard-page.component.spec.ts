@@ -13,6 +13,7 @@ describe('AdminDashboardPageComponent', () => {
   let component: AdminDashboardPageComponent;
 
   const groupId = '11111111-1111-1111-1111-111111111111';
+  const signedSharePath = `/g/${groupId}?sig=sig_abc123456`;
 
   const sampleOpenGroup: AdminGroupView = {
     id: groupId,
@@ -20,7 +21,7 @@ describe('AdminDashboardPageComponent', () => {
     organizerUserId: 'org-1',
     status: 'OPEN',
     geographicRestrictionRelaxed: false,
-    sharePath: `/g/${groupId}`,
+    sharePath: signedSharePath,
     createdAt: '2026-11-13T18:00:00Z',
     drawnAt: null,
     participants: [
@@ -56,14 +57,15 @@ describe('AdminDashboardPageComponent', () => {
 
   const apiMock = {
     getAdminGroup: vi.fn(),
-    updateGroupPin: vi.fn(),
+    rotateInviteLink: vi.fn(),
     removeParticipant: vi.fn(),
     executeDraw: vi.fn(),
     generatePasswordResetToken: vi.fn()
   };
 
   const shareMock = {
-    shareLink: vi.fn()
+    shareLink: vi.fn(),
+    copyUrl: vi.fn()
   };
 
   beforeEach(async () => {
@@ -71,7 +73,11 @@ describe('AdminDashboardPageComponent', () => {
     apiMock.getAdminGroup.mockReturnValue(of(sampleOpenGroup));
     shareMock.shareLink.mockResolvedValue({
       method: 'clipboard',
-      url: `http://localhost:4200/g/${groupId}`
+      url: `http://localhost:4200${signedSharePath}`
+    });
+    shareMock.copyUrl.mockResolvedValue({
+      method: 'clipboard',
+      url: `http://localhost:4200${signedSharePath}`
     });
 
     await TestBed.configureTestingModule({
@@ -96,9 +102,10 @@ describe('AdminDashboardPageComponent', () => {
     fixture.detectChanges();
   });
 
-  it('renders group status, participants, GPS status and human reveal status without exposing secrets', () => {
+  it('renders group status, signed sharePath, participants, GPS status and human reveal status without Alterar PIN do Grupo or secret fields', () => {
     const text = fixture.nativeElement.textContent;
     expect(text).toContain('Natal Família Silva');
+    expect(text).toContain(signedSharePath);
     expect(text).toContain('@tiago.silva');
     expect(text).toContain('@maria.silva');
     expect(text).toContain('@lucas.silva');
@@ -107,6 +114,8 @@ describe('AdminDashboardPageComponent', () => {
     expect(text).toContain('Inscrições Abertas');
     expect(text).toContain('Aguardando sorteio');
     expect(text).toContain('Convidar pelo WhatsApp');
+    expect(text).toContain('Gerar Novo Link de Convite');
+    expect(text).not.toContain('Alterar PIN do Grupo');
     expect(text).not.toContain('WAITING_DRAW');
     expect(text).not.toContain('PENDING_REVEAL');
     expect(text).not.toContain('drawnParticipantId');
@@ -114,7 +123,7 @@ describe('AdminDashboardPageComponent', () => {
     expect(text.toLowerCase()).not.toContain('username');
   });
 
-  it('shares the group WhatsApp link (/g/{uuid}) via ShareLinkService', async () => {
+  it('shares the signed group WhatsApp link with exact message and copies URL via copyUrl', async () => {
     const shareBtn: HTMLButtonElement = fixture.nativeElement.querySelector(
       '[data-testid="share-group-link-btn"]'
     );
@@ -123,30 +132,47 @@ describe('AdminDashboardPageComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(shareMock.shareLink).toHaveBeenCalledWith(
-      expect.objectContaining({
-        pathOrUrl: `/g/${groupId}`,
-        text: expect.stringContaining('PIN de entrada ao organizador')
-      })
-    );
+    expect(shareMock.shareLink).toHaveBeenCalledWith({
+      title: 'Amigo Secreto: Natal Família Silva',
+      text: 'Participe do grupo de amigo secreto "Natal Família Silva" clicando no link abaixo:',
+      pathOrUrl: signedSharePath,
+      openWhatsAppFallback: true
+    });
     expect(fixture.nativeElement.querySelector('[data-testid="share-feedback"]')?.textContent).toContain(
-      `/g/${groupId}`
+      signedSharePath
     );
-  });
 
-  it('updates group PIN via PUT /admin/pin and displays feedback', () => {
-    apiMock.updateGroupPin.mockReturnValue(of(void 0));
-
-    component.updateGroupPinForm.setValue({ groupPin: '9988' });
-    const updateBtn: HTMLButtonElement = fixture.nativeElement.querySelector(
-      '[data-testid="update-group-pin-btn"]'
+    const copyBtn: HTMLButtonElement = fixture.nativeElement.querySelector(
+      '[data-testid="copy-group-link-btn"]'
     );
-    updateBtn.closest('form')?.dispatchEvent(new Event('submit'));
+    copyBtn.click();
+    await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(apiMock.updateGroupPin).toHaveBeenCalledWith(groupId, { groupPin: '9988' });
-    expect(fixture.nativeElement.querySelector('[data-testid="update-group-pin-feedback"]')?.textContent).toContain(
-      'PIN do grupo atualizado com sucesso!'
+    expect(shareMock.copyUrl).toHaveBeenCalledWith(signedSharePath);
+  });
+
+  it('rotates the group invite link via POST /admin/invite-link/rotate and displays invalidation feedback', () => {
+    const rotatedPath = `/g/${groupId}?sig=sig_new_rotated_999`;
+    apiMock.rotateInviteLink.mockReturnValue(
+      of({
+        ...sampleOpenGroup,
+        sharePath: rotatedPath
+      })
+    );
+
+    const rotateBtn: HTMLButtonElement = fixture.nativeElement.querySelector(
+      '[data-testid="rotate-invite-link-btn"]'
+    );
+    rotateBtn.click();
+    fixture.detectChanges();
+
+    expect(apiMock.rotateInviteLink).toHaveBeenCalledWith(groupId);
+    expect(fixture.nativeElement.querySelector('[data-testid="signed-share-path"]')?.textContent).toContain(
+      rotatedPath
+    );
+    expect(fixture.nativeElement.querySelector('[data-testid="share-feedback"]')?.textContent).toContain(
+      'Novo link de convite gerado! O link anterior foi invalidado.'
     );
   });
 

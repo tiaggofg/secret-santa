@@ -119,8 +119,22 @@ import { formatParticipantCount, getAvatarTone, getInitials, suggestUsername } f
         </section>
 
         @if (g.status === 'OPEN') {
-          <!-- OPEN STATE: Direct WhatsApp link join or authenticated join -->
-          @if (!authStore.isAuthenticated()) {
+          @if (!g.joined && !g.organizer && !g.inviteValid) {
+            <!-- Blocked when invite link signature is missing or invalid -->
+            <section
+              data-testid="invalid-invite-notice"
+              class="bg-cranberry-50 border border-cranberry-200 rounded-3xl p-5 shadow-sm space-y-2 text-cranberry-900"
+            >
+              <div class="flex items-center gap-2 font-display font-bold text-base text-cranberry-900">
+                <app-festive-icon name="shield-eye" svgClass="w-5 h-5 text-cranberry-700 shrink-0" />
+                <span>Convite Oficial Necessário</span>
+              </div>
+              <p class="text-sm text-cranberry-800 leading-relaxed">
+                Este grupo é privado. Para participar, acesse através do link de convite oficial enviado pelo organizador.
+              </p>
+            </section>
+          } @else if (!authStore.isAuthenticated()) {
+            <!-- OPEN STATE: Direct WhatsApp link join for visitor with valid invite -->
             <section
               data-testid="whatsapp-visitor-join-section"
               class="bg-festive-card border border-festive-border rounded-3xl p-5 shadow-sm space-y-4"
@@ -180,32 +194,6 @@ import { formatParticipantCount, getAvatarTone, getInitials, suggestUsername } f
                         class="absolute right-1 min-w-11 min-h-11 rounded-lg flex items-center justify-center text-ink-600 hover:text-pine-900 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
                       >
                         <app-festive-icon [name]="showVisitorLoginPin() ? 'eye-off' : 'eye'" svgClass="w-5 h-5" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label for="vis-login-group-pin" class="block text-sm font-semibold text-ink-900 mb-1.5">
-                      PIN do grupo (4 a 6 dígitos)
-                    </label>
-                    <div class="relative flex items-center">
-                      <input
-                        id="vis-login-group-pin"
-                        data-testid="visitor-group-pin-input"
-                        [type]="showVisitorGroupPin() ? 'text' : 'password'"
-                        inputmode="numeric"
-                        maxlength="6"
-                        formControlName="groupPin"
-                        placeholder="••••"
-                        class="w-full min-h-12 rounded-xl border border-stone-300 bg-white pl-3.5 pr-12 py-2.5 text-lg tracking-widest tabular-nums text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
-                      />
-                      <button
-                        type="button"
-                        (click)="showVisitorGroupPin.set(!showVisitorGroupPin())"
-                        aria-label="Mostrar ou ocultar PIN do grupo"
-                        class="absolute right-1 min-w-11 min-h-11 rounded-lg flex items-center justify-center text-ink-600 hover:text-pine-900 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-                      >
-                        <app-festive-icon [name]="showVisitorGroupPin() ? 'eye-off' : 'eye'" svgClass="w-5 h-5" />
                       </button>
                     </div>
                   </div>
@@ -296,32 +284,6 @@ import { formatParticipantCount, getAvatarTone, getInitials, suggestUsername } f
                     </div>
                   </div>
 
-                  <div>
-                    <label for="vis-reg-group-pin" class="block text-sm font-semibold text-ink-900 mb-1.5">
-                      PIN do grupo (4 a 6 dígitos)
-                    </label>
-                    <div class="relative flex items-center">
-                      <input
-                        id="vis-reg-group-pin"
-                        data-testid="visitor-group-pin-input"
-                        [type]="showVisitorGroupPin() ? 'text' : 'password'"
-                        inputmode="numeric"
-                        maxlength="6"
-                        formControlName="groupPin"
-                        placeholder="••••"
-                        class="w-full min-h-12 rounded-xl border border-stone-300 bg-white pl-3.5 pr-12 py-2.5 text-lg tracking-widest tabular-nums text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
-                      />
-                      <button
-                        type="button"
-                        (click)="showVisitorGroupPin.set(!showVisitorGroupPin())"
-                        aria-label="Mostrar ou ocultar PIN do grupo"
-                        class="absolute right-1 min-w-11 min-h-11 rounded-lg flex items-center justify-center text-ink-600 hover:text-pine-900 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-                      >
-                        <app-festive-icon [name]="showVisitorGroupPin() ? 'eye-off' : 'eye'" svgClass="w-5 h-5" />
-                      </button>
-                    </div>
-                  </div>
-
                   <button
                     type="submit"
                     data-testid="visitor-register-join-btn"
@@ -356,34 +318,6 @@ import { formatParticipantCount, getAvatarTone, getInitials, suggestUsername } f
                 <p class="text-sm text-ink-900">
                   Olá, <strong>{{ authStore.name() }}</strong>. Toque abaixo para confirmar sua participação neste grupo:
                 </p>
-
-                @if (!g.organizer) {
-                  <div>
-                    <label for="auth-group-pin" class="block text-sm font-semibold text-ink-900 mb-1.5">
-                      PIN do grupo (4 a 6 dígitos)
-                    </label>
-                    <div class="relative flex items-center">
-                      <input
-                        id="auth-group-pin"
-                        data-testid="authenticated-group-pin-input"
-                        [type]="showAuthGroupPin() ? 'text' : 'password'"
-                        inputmode="numeric"
-                        maxlength="6"
-                        [formControl]="authenticatedGroupPinControl"
-                        placeholder="••••"
-                        class="w-full min-h-12 rounded-xl border border-stone-300 bg-white pl-3.5 pr-12 py-2.5 text-lg tracking-widest tabular-nums text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
-                      />
-                      <button
-                        type="button"
-                        (click)="showAuthGroupPin.set(!showAuthGroupPin())"
-                        aria-label="Mostrar ou ocultar PIN do grupo"
-                        class="absolute right-1 min-w-11 min-h-11 rounded-lg flex items-center justify-center text-ink-600 hover:text-pine-900 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-                      >
-                        <app-festive-icon [name]="showAuthGroupPin() ? 'eye-off' : 'eye'" svgClass="w-5 h-5" />
-                      </button>
-                    </div>
-                  </div>
-                }
 
                 <button
                   type="button"
@@ -625,8 +559,6 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
   readonly visitorMode = signal<'login' | 'register'>('login');
   readonly showVisitorRegPin = signal<boolean>(false);
   readonly showVisitorLoginPin = signal<boolean>(false);
-  readonly showVisitorGroupPin = signal<boolean>(false);
-  readonly showAuthGroupPin = signal<boolean>(false);
   readonly showRevealPin = signal<boolean>(false);
   readonly isSubmitting = signal<boolean>(false);
   readonly capturingGeo = signal<boolean>(false);
@@ -638,24 +570,18 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
   readonly revealedByUsername = signal<string | null>(null);
 
   private groupId = '';
+  private inviteSignature = '';
   private visitorUsernameManuallyEdited = false;
-
-  readonly authenticatedGroupPinControl = this.fb.control('', [
-    Validators.required,
-    Validators.pattern(/^\d{4,6}$/)
-  ]);
 
   readonly visitorRegisterForm = this.fb.group({
     name: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(60)]],
     username: ['', [Validators.required, Validators.pattern(/^[a-z0-9._-]{3,30}$/)]],
-    pin: ['', [Validators.required, Validators.pattern(/^\d{4,6}$/)]],
-    groupPin: ['', [Validators.required, Validators.pattern(/^\d{4,6}$/)]]
+    pin: ['', [Validators.required, Validators.pattern(/^\d{4,6}$/)]]
   });
 
   readonly visitorLoginForm = this.fb.group({
     username: ['', [Validators.required, Validators.pattern(/^[a-z0-9._-]{3,30}$/)]],
-    pin: ['', [Validators.required, Validators.pattern(/^\d{4,6}$/)]],
-    groupPin: ['', [Validators.required, Validators.pattern(/^\d{4,6}$/)]]
+    pin: ['', [Validators.required, Validators.pattern(/^\d{4,6}$/)]]
   });
 
   readonly revealForm = this.fb.group({
@@ -665,6 +591,7 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.groupId = this.route.snapshot.paramMap.get('groupId') ?? '';
+    this.inviteSignature = this.route.snapshot.queryParamMap?.get('sig') ?? '';
     const loggedInUsername = this.authStore.username();
     if (loggedInUsername) {
       this.revealForm.controls.username.setValue(loggedInUsername);
@@ -700,7 +627,7 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
   }
 
   loadPublicGroup(): void {
-    this.apiService.getPublicGroup(this.groupId).subscribe({
+    this.apiService.getPublicGroup(this.groupId, this.inviteSignature || undefined).subscribe({
       next: (g) => {
         this.group.set(g);
       },
@@ -730,20 +657,18 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
   async submitVisitorRegisterAndJoin(): Promise<void> {
     this.errorMessage.set(null);
     this.statusMessage.set(null);
-    const { name, username, pin, groupPin } = this.visitorRegisterForm.getRawValue();
+    const { name, username, pin } = this.visitorRegisterForm.getRawValue();
     const trimmedName = name.trim();
     const normalizedUsername = username.trim().toLowerCase();
-    const trimmedGroupPin = groupPin.trim();
 
     if (
       trimmedName.length < 2 ||
       trimmedName.length > 60 ||
       !/^[a-z0-9._-]{3,30}$/.test(normalizedUsername) ||
-      !/^\d{4,6}$/.test(pin) ||
-      !/^\d{4,6}$/.test(trimmedGroupPin)
+      !/^\d{4,6}$/.test(pin)
     ) {
       this.errorMessage.set(
-        'Informe seu nome (2-60 caracteres), nome de usuário válido, seu PIN pessoal e o PIN do grupo (4 a 6 dígitos).'
+        'Informe seu nome (2-60 caracteres), nome de usuário válido e um PIN pessoal de 4 a 6 dígitos.'
       );
       return;
     }
@@ -761,7 +686,7 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
         name: trimmedName,
         username: normalizedUsername,
         pin,
-        groupPin: trimmedGroupPin,
+        inviteSignature: this.inviteSignature || undefined,
         latitude: geo.latitude,
         longitude: geo.longitude
       })
@@ -777,7 +702,6 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
             });
           }
           this.showVisitorRegPin.set(false);
-          this.showVisitorGroupPin.set(false);
           this.visitorRegisterForm.reset();
           this.visitorUsernameManuallyEdited = false;
           this.statusMessage.set('Cadastro e inscrição no grupo realizados com sucesso!');
@@ -786,7 +710,9 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
         error: (err: HttpErrorResponse) => {
           this.isSubmitting.set(false);
           if (err.status === 403) {
-            this.errorMessage.set('PIN do grupo incorreto. Peça o PIN correto ao organizador.');
+            this.errorMessage.set(
+              'Link de convite inválido ou expirado. Solicite o link oficial ao organizador do grupo.'
+            );
           } else if (err.status === 409) {
             this.errorMessage.set(
               'Este nome de usuário já está cadastrado ou já participa do grupo. Use a opção "Já tem uma conta? Entrar".'
@@ -801,16 +727,11 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
   async submitVisitorLoginAndJoin(): Promise<void> {
     this.errorMessage.set(null);
     this.statusMessage.set(null);
-    const { username, pin, groupPin } = this.visitorLoginForm.getRawValue();
+    const { username, pin } = this.visitorLoginForm.getRawValue();
     const normalizedUsername = username.trim().toLowerCase();
-    const trimmedGroupPin = groupPin.trim();
 
-    if (
-      !/^[a-z0-9._-]{3,30}$/.test(normalizedUsername) ||
-      !/^\d{4,6}$/.test(pin) ||
-      !/^\d{4,6}$/.test(trimmedGroupPin)
-    ) {
-      this.errorMessage.set('Informe seu nome de usuário, seu PIN pessoal e o PIN do grupo (4 a 6 dígitos).');
+    if (!/^[a-z0-9._-]{3,30}$/.test(normalizedUsername) || !/^\d{4,6}$/.test(pin)) {
+      this.errorMessage.set('Informe seu nome de usuário e seu PIN pessoal (4 a 6 dígitos).');
       return;
     }
 
@@ -826,7 +747,7 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
       .joinGroup(this.groupId, {
         username: normalizedUsername,
         pin,
-        groupPin: trimmedGroupPin,
+        inviteSignature: this.inviteSignature || undefined,
         latitude: geo.latitude,
         longitude: geo.longitude
       })
@@ -842,7 +763,6 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
             });
           }
           this.showVisitorLoginPin.set(false);
-          this.showVisitorGroupPin.set(false);
           this.visitorLoginForm.reset();
           this.statusMessage.set('Login e inscrição no grupo realizados com sucesso!');
           this.loadPublicGroup();
@@ -850,7 +770,9 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
         error: (err: HttpErrorResponse) => {
           this.isSubmitting.set(false);
           if (err.status === 403) {
-            this.errorMessage.set('PIN do grupo incorreto. Peça o PIN correto ao organizador.');
+            this.errorMessage.set(
+              'Link de convite inválido ou expirado. Solicite o link oficial ao organizador do grupo.'
+            );
           } else if (err.status === 401) {
             this.errorMessage.set('Nome de usuário ou PIN pessoal incorreto.');
           } else if (err.status === 409) {
@@ -868,12 +790,6 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
     this.statusMessage.set(null);
     const currentGroup = this.group();
     const isOrganizer = currentGroup?.organizer ?? false;
-    const groupPin = this.authenticatedGroupPinControl.value.trim();
-
-    if (!isOrganizer && !/^\d{4,6}$/.test(groupPin)) {
-      this.errorMessage.set('Informe o PIN do grupo (4 a 6 dígitos) para confirmar sua participação.');
-      return;
-    }
 
     this.isSubmitting.set(true);
     this.capturingGeo.set(true);
@@ -886,22 +802,22 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
 
     this.apiService
       .joinGroup(this.groupId, {
-        groupPin: isOrganizer ? undefined : groupPin,
+        inviteSignature: isOrganizer ? undefined : this.inviteSignature || undefined,
         latitude: geo.latitude,
         longitude: geo.longitude
       })
       .subscribe({
         next: () => {
           this.isSubmitting.set(false);
-          this.showAuthGroupPin.set(false);
-          this.authenticatedGroupPinControl.reset();
           this.statusMessage.set('Inscrição confirmada com sucesso!');
           this.loadPublicGroup();
         },
         error: (err: HttpErrorResponse) => {
           this.isSubmitting.set(false);
           if (err.status === 403) {
-            this.errorMessage.set('PIN do grupo incorreto. Peça o PIN correto ao organizador.');
+            this.errorMessage.set(
+              'Link de convite inválido ou expirado. Solicite o link oficial ao organizador do grupo.'
+            );
           } else {
             this.errorMessage.set('Não foi possível concluir sua inscrição.');
           }

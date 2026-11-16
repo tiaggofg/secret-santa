@@ -23,7 +23,7 @@ public final class SecretSantaGroup {
 
     private final UUID id;
     private final String eventName;
-    private PinHash groupPinHash;
+    private InviteSignature inviteSignature;
     private final UUID organizerUserId;
     private GroupStatus status;
     private boolean geographicRestrictionRelaxed;
@@ -35,7 +35,7 @@ public final class SecretSantaGroup {
     private SecretSantaGroup(
             UUID id,
             String eventName,
-            PinHash groupPinHash,
+            InviteSignature inviteSignature,
             UUID organizerUserId,
             GroupStatus status,
             boolean geographicRestrictionRelaxed,
@@ -45,7 +45,7 @@ public final class SecretSantaGroup {
             List<Participant> participants) {
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.eventName = validateEventName(eventName);
-        this.groupPinHash = Objects.requireNonNull(groupPinHash, "groupPinHash must not be null");
+        this.inviteSignature = Objects.requireNonNull(inviteSignature, "inviteSignature must not be null");
         this.organizerUserId = Objects.requireNonNull(organizerUserId, "organizerUserId must not be null");
         this.status = Objects.requireNonNull(status, "status must not be null");
         this.geographicRestrictionRelaxed = geographicRestrictionRelaxed;
@@ -57,13 +57,22 @@ public final class SecretSantaGroup {
 
     public static SecretSantaGroup create(
             String eventName,
-            PinHash groupPinHash,
+            InviteSignature inviteSignature,
+            UUID organizerUserId,
+            Instant now) {
+        return create(UUID.randomUUID(), eventName, inviteSignature, organizerUserId, now);
+    }
+
+    public static SecretSantaGroup create(
+            UUID id,
+            String eventName,
+            InviteSignature inviteSignature,
             UUID organizerUserId,
             Instant now) {
         return new SecretSantaGroup(
-                UUID.randomUUID(),
+                id,
                 eventName,
-                groupPinHash,
+                inviteSignature,
                 organizerUserId,
                 GroupStatus.OPEN,
                 false,
@@ -76,7 +85,7 @@ public final class SecretSantaGroup {
     public static SecretSantaGroup reconstitute(
             UUID id,
             String eventName,
-            PinHash groupPinHash,
+            InviteSignature inviteSignature,
             UUID organizerUserId,
             GroupStatus status,
             boolean geographicRestrictionRelaxed,
@@ -87,7 +96,7 @@ public final class SecretSantaGroup {
         return new SecretSantaGroup(
                 id,
                 eventName,
-                groupPinHash,
+                inviteSignature,
                 organizerUserId,
                 status,
                 geographicRestrictionRelaxed,
@@ -215,16 +224,16 @@ public final class SecretSantaGroup {
         return drawn.name().value();
     }
 
-    public void updateGroupPinHash(PinHash newGroupPinHash) {
-        this.groupPinHash = Objects.requireNonNull(newGroupPinHash, "groupPinHash must not be null");
+    public void rotateInviteSignature(InviteSignature newInviteSignature) {
+        this.inviteSignature = Objects.requireNonNull(newInviteSignature, "inviteSignature must not be null");
     }
 
     public UUID id() {
         return id;
     }
 
-    public PinHash groupPinHash() {
-        return groupPinHash;
+    public InviteSignature inviteSignature() {
+        return inviteSignature;
     }
 
     public String eventName() {

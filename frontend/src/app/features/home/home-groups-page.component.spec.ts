@@ -104,7 +104,7 @@ describe('HomeGroupsPageComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('+ Novo Amigo Secreto');
   });
 
-  it('opens Novo Amigo Secreto modal without suggestions, requires groupPin and creates group on submit', () => {
+  it('opens Novo Amigo Secreto modal without groupPin field and creates group on submit', () => {
     authStore.setSession({
       token: 'tok-1',
       userId: 'u-1',
@@ -126,7 +126,8 @@ describe('HomeGroupsPageComponent', () => {
     expect(modal).not.toBeNull();
     expect(modal.textContent).toContain('Novo Amigo Secreto');
     expect(modal.textContent).toContain('Criar Amigo Secreto');
-    expect(modal.textContent).not.toContain('Ceia de Natal em Casa');
+    expect(modal.querySelector('[data-testid="group-pin-input"]')).toBeNull();
+    expect(modal.textContent).not.toContain('PIN de Entrada do Grupo');
 
     apiMock.createGroup.mockReturnValue(
       of({
@@ -135,19 +136,19 @@ describe('HomeGroupsPageComponent', () => {
         organizerUserId: 'u-1',
         status: 'OPEN',
         geographicRestrictionRelaxed: false,
-        sharePath: '/g/22222222-2222-2222-2222-222222222222',
+        sharePath: '/g/22222222-2222-2222-2222-222222222222?sig=sig_abc123',
         createdAt: '2026-11-13T18:20:00Z',
         drawnAt: null,
         participants: []
       })
     );
 
-    component.createGroupForm.setValue({ eventName: 'Natal 2026', groupPin: '5678' });
+    component.createGroupForm.setValue({ eventName: 'Natal 2026' });
     const createForm: HTMLFormElement = fixture.nativeElement.querySelector('[data-testid="create-group-form"]');
     createForm.dispatchEvent(new Event('submit'));
     fixture.detectChanges();
 
-    expect(apiMock.createGroup).toHaveBeenCalledWith({ eventName: 'Natal 2026', groupPin: '5678' });
+    expect(apiMock.createGroup).toHaveBeenCalledWith({ eventName: 'Natal 2026' });
     expect(fixture.nativeElement.querySelector('[data-testid="create-group-modal"]')).toBeNull();
     expect(fixture.nativeElement.textContent).toContain('Grupo "Natal 2026" criado com sucesso!');
   });

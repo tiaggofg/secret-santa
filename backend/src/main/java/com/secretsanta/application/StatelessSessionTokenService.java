@@ -1,9 +1,11 @@
 package com.secretsanta.application;
 
 import com.secretsanta.domain.exception.InvalidCredentialsException;
+import com.secretsanta.domain.model.InviteSignature;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -21,10 +23,12 @@ public class StatelessSessionTokenService {
 
     private static final String HMAC_ALGORITHM = "HmacSHA256";
     private static final String BEARER_PREFIX = "Bearer ";
+    private static final int INVITE_NONCE_BYTES = 16;
 
     private final byte[] secretBytes;
     private final Duration tokenTtl;
     private final Clock clock;
+    private final SecureRandom secureRandom = new SecureRandom();
 
     @Autowired
     public StatelessSessionTokenService(
@@ -40,6 +44,15 @@ public class StatelessSessionTokenService {
         this.secretBytes = secret.getBytes(StandardCharsets.UTF_8);
         this.tokenTtl = Objects.requireNonNull(tokenTtl, "tokenTtl must not be null");
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
+    }
+
+    public InviteSignature generateInviteSignature(UUID groupId) {
+        Objects.requireNonNull(groupId, "groupId must not be null");
+        byte[] nonce = new byte[INVITE_NONCE_BYTES];
+        secureRandom.nextBytes(nonce);
+        String nonceBase64Url = Base64.getUrlEncoder().withoutPadding().encodeToString(nonce);
+        String signature = sign(groupId + ":" + nonceBase64Url);
+        return new InviteSignature(signature);
     }
 
     public String issueToken(UUID userId, String username) {

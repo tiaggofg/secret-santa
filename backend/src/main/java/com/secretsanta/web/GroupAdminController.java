@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -40,8 +39,7 @@ public class GroupAdminController {
             @RequestBody(required = false) CreateGroupRequest request) {
         AuthenticatedUser user = tokenService.parseAndValidate(authorizationHeader);
         String eventName = request != null ? request.eventName() : null;
-        String groupPin = request != null ? request.groupPin() : null;
-        return applicationService.createGroup(user.userId(), eventName, groupPin);
+        return applicationService.createGroup(user.userId(), eventName);
     }
 
     @GetMapping("/{groupId}/admin")
@@ -54,16 +52,14 @@ public class GroupAdminController {
         return applicationService.getAdminGroup(groupId, user.userId());
     }
 
-    @PutMapping("/{groupId}/admin/pin")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void updateGroupPin(
+    @PostMapping("/{groupId}/admin/invite-link/rotate")
+    @ResponseStatus(HttpStatus.OK)
+    public AdminGroupView rotateInviteLink(
             @PathVariable("groupId") String groupIdRaw,
-            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader,
-            @RequestBody(required = false) UpdateGroupPinRequest request) {
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader) {
         UUID groupId = GroupPublicController.parseGroupId(groupIdRaw);
         AuthenticatedUser user = tokenService.parseAndValidate(authorizationHeader);
-        String groupPin = request != null ? request.groupPin() : null;
-        applicationService.updateGroupPin(groupId, user.userId(), groupPin);
+        return applicationService.rotateInviteSignature(groupId, user.userId());
     }
 
     @DeleteMapping("/{groupId}/admin/participants/{participantId}")
@@ -98,9 +94,6 @@ public class GroupAdminController {
         return applicationService.generatePasswordResetToken(groupId, user.userId(), participantId);
     }
 
-    public record CreateGroupRequest(String eventName, String groupPin) {
-    }
-
-    public record UpdateGroupPinRequest(String groupPin) {
+    public record CreateGroupRequest(String eventName) {
     }
 }

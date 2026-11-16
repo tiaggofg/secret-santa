@@ -56,15 +56,23 @@
 - **Trade-off**: O organizador precisa informar o PIN do grupo separadamente aos convidados ao compartilhar o link `/g/{uuid}`.
 - **Scope**: Domínio, Persistência MongoDB (índices em `organizerUserId` e `participants.userId`, remoção do índice de `publicSlug`), API REST `/api/v1/groups` e Frontend Angular.
 - **Date**: 2026-11-15
+- **Status**: superseded (by AD-008 regarding groupPin)
+
+### AD-008
+- **Decision**: Remover o `groupPin` da criação/entrada de grupos e substituí-lo por **URL de convite assinada via HMAC-SHA256 (`inviteSignature`) persistida no MongoDB** (`/g/{groupId}?sig={inviteSignature}`), expondo a assinatura exclusivamente no `AdminGroupView`, exigindo validação em tempo constante na entrada de não-organizadores (com suporte a rotação de link no Admin), adicionando `favicon.ico`/`favicon.svg` natalinos, atualizando o compartilhamento de WhatsApp (mensagem completa + abertura de `wa.me` no desktop) e automatizando o redeploy do backend no Portainer CE via GitHub Actions usando a API REST autenticada (`X-API-Key` + `PUT /api/stacks/{id}/git/redeploy`).
+- **Reason**: Elimina a fricção de distribuir e digitar um PIN separado para o grupo mantendo o acesso privado apenas a quem possui o link assinado válido no banco, e viabiliza CI/CD no Portainer CE sem depender de webhooks exclusivos da edição Business.
+- **Trade-off**: Quem obtiver a URL assinada completa consegue ingressar no grupo até que o organizador acione a rotação do link (`Gerar Novo Link de Convite`); o banco será limpo antes do deploy, dispensando migração de documentos legados.
+- **Scope**: Domínio (`InviteSignature`, `SecretSantaGroup`), Persistência MongoDB, API REST `/api/v1/groups`, Frontend Angular (`favicon.ico`, `ShareLinkService`, Home, PublicGroup, AdminDashboard) e `.github/workflows/deploy-backend.yml`.
+- **Date**: 2026-11-15
 - **Status**: active
 
 ## Handoff
 
-- **Feature**: private-groups-ux-patch (`.specs/features/private-groups-ux-patch`)
-- **Phase / Task**: Done — Implementação integral da spec concluída e validada (`mvn test`: 82 pass; `npm test`: 38 pass; `ng build`: ok; Playwright E2E desktop + mobile: pass)
-- **Completed**: `B1`..`B4`, `F1`..`F5`, `V1`..`V3`, `.specs/features/private-groups-ux-patch/tasks.md`
+- **Feature**: signed-invite-and-favicon (`.specs/features/signed-invite-and-favicon`)
+- **Phase / Task**: Implemented & Verified (`B1`..`B4`, `F1`..`F5`, `C1`, `V1`..`V3`) — Awaiting user approval for commit/push
+- **Completed**: `B1`..`B4` (Backend), `F1`..`F5` (Frontend), `C1` (`.github/workflows/deploy-backend.yml`), `V1` (`mvn test`, `npm test`, `npm run build`), `V2` (Playwright E2E Desktop & Mobile), `V3` (`.specs/STATE.md`, `.specs/features/signed-invite-and-favicon/tasks.md`)
 - **In-progress** (file:line): none
-- **Next step**: Pronto (alterações aprovadas e commitadas na branch `main`)
+- **Next step**: Solicitar aprovação explícita do usuário e, após confirmação, executar `git add`, `git commit` e `git push`
 - **Blockers**: none
-- **Uncommitted files**: none
+- **Uncommitted files**: Backend, Frontend, `.github/workflows/deploy-backend.yml`, `.specs/STATE.md`, `.specs/features/signed-invite-and-favicon/`
 - **Branch**: main

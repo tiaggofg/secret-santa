@@ -9,7 +9,7 @@ import com.secretsanta.domain.exception.GroupAlreadyDrawnException;
 import com.secretsanta.domain.exception.GroupNotDrawnYetException;
 import com.secretsanta.domain.exception.InsufficientParticipantsForDrawException;
 import com.secretsanta.domain.exception.InvalidCredentialsException;
-import com.secretsanta.domain.exception.InvalidGroupPinException;
+import com.secretsanta.domain.exception.InvalidInviteSignatureException;
 import com.secretsanta.domain.exception.InvalidPasswordResetTokenException;
 import com.secretsanta.domain.exception.ResourceNotFoundException;
 import com.secretsanta.domain.exception.UnauthorizedOrganizerAccessException;
@@ -59,14 +59,14 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    void shouldMapInvalidGroupPinExceptionToHttp403Forbidden() {
-        ProblemDetail problem = handler.handleInvalidGroupPin(
-                new InvalidGroupPinException("Invalid group PIN"));
+    void shouldMapInvalidInviteSignatureExceptionToHttp403Forbidden() {
+        ProblemDetail problem = handler.handleInvalidInviteSignature(
+                new InvalidInviteSignatureException("Invalid or expired group invite link"));
 
         assertThat(problem.getStatus()).isEqualTo(HttpStatus.FORBIDDEN.value());
         assertThat(problem.getTitle()).isEqualTo("Forbidden");
-        assertThat(problem.getDetail()).isEqualTo("Invalid group PIN");
-        assertThat(problem.getProperties()).containsEntry("errorCode", "INVALID_GROUP_PIN");
+        assertThat(problem.getDetail()).isEqualTo("Invalid or expired group invite link");
+        assertThat(problem.getProperties()).containsEntry("errorCode", "INVALID_INVITE_SIGNATURE");
     }
 
     @Test

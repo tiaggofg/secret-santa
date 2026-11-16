@@ -43,11 +43,6 @@ export interface GroupDiscoveryView {
 
 export interface CreateGroupRequest {
   eventName: string;
-  groupPin: string;
-}
-
-export interface UpdateGroupPinRequest {
-  groupPin: string;
 }
 
 export interface AdminParticipantView {
@@ -91,6 +86,7 @@ export interface PublicGroupView {
   sharePath: string;
   organizer: boolean;
   joined: boolean;
+  inviteValid: boolean;
   participantsVisible: boolean;
   participantCount: number;
   createdAt: string;
@@ -102,7 +98,7 @@ export interface JoinGroupRequest {
   name?: string;
   username?: string;
   pin?: string;
-  groupPin?: string;
+  inviteSignature?: string;
   latitude: number | null;
   longitude: number | null;
 }

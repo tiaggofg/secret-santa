@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.secretsanta.config.MongoTestContainerConfig;
 import com.secretsanta.domain.model.GeoCoordinates;
 import com.secretsanta.domain.model.GroupStatus;
+import com.secretsanta.domain.model.InviteSignature;
 import com.secretsanta.domain.model.Participant;
 import com.secretsanta.domain.model.ParticipantName;
 import com.secretsanta.domain.model.PasswordResetTokenHash;
@@ -105,7 +106,7 @@ class MongoPersistenceAdaptersIT {
         UUID organizerId = UUID.randomUUID();
         SecretSantaGroup group = SecretSantaGroup.create(
                 "Natal da Família",
-                new PinHash("$2a$10$groupPinHash1"),
+                new InviteSignature("sig_InviteSignatureValueForTest123456"),
                 organizerId,
                 NOW);
 
@@ -138,7 +139,7 @@ class MongoPersistenceAdaptersIT {
         SecretSantaGroup loaded = groupRepository.findById(group.id()).orElseThrow();
         assertThat(loaded.id()).isEqualTo(group.id());
         assertThat(loaded.eventName()).isEqualTo("Natal da Família");
-        assertThat(loaded.groupPinHash().value()).isEqualTo("$2a$10$groupPinHash1");
+        assertThat(loaded.inviteSignature().value()).isEqualTo("sig_InviteSignatureValueForTest123456");
         assertThat(loaded.organizerUserId()).isEqualTo(organizerId);
         assertThat(loaded.status()).isEqualTo(GroupStatus.DRAWN);
         assertThat(loaded.drawnAt()).isEqualTo(NOW.plusSeconds(300));
@@ -156,7 +157,7 @@ class MongoPersistenceAdaptersIT {
         UUID organizerId = UUID.randomUUID();
         SecretSantaGroup created = groupRepository.save(SecretSantaGroup.create(
                 "Natal Concorrente",
-                new PinHash("$2a$10$groupPinHash2"),
+                new InviteSignature("sig_ConcurrentInviteSignature123456"),
                 organizerId,
                 NOW));
 
@@ -189,12 +190,12 @@ class MongoPersistenceAdaptersIT {
 
         SecretSantaGroup organizedOlder = SecretSantaGroup.create(
                 "Grupo Organizado",
-                new PinHash("$2a$10$hash1"),
+                new InviteSignature("sig_OrganizedOlderInviteSig123456"),
                 userId,
                 NOW);
         SecretSantaGroup participatedNewer = SecretSantaGroup.create(
                 "Grupo Participante",
-                new PinHash("$2a$10$hash2"),
+                new InviteSignature("sig_ParticipatedNewerInvite123456"),
                 otherUserId,
                 NOW.plusSeconds(120));
         participatedNewer.registerParticipant(
@@ -205,7 +206,7 @@ class MongoPersistenceAdaptersIT {
                 NOW.plusSeconds(130));
         SecretSantaGroup thirdPartyGroup = SecretSantaGroup.create(
                 "Grupo Terceiros",
-                new PinHash("$2a$10$hash3"),
+                new InviteSignature("sig_ThirdPartyInviteSig1234567890"),
                 otherUserId,
                 NOW.plusSeconds(240));
 

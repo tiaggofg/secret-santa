@@ -276,7 +276,7 @@ import { formatParticipantCount, getAvatarTone, getInitials } from '../../shared
                     Novo Amigo Secreto
                   </h2>
                   <p class="text-xs text-ink-600 mt-0.5">
-                    Você será o organizador e poderá convidar os participantes pelo link.
+                    Você será o organizador e poderá convidar os participantes pelo link exclusivo.
                   </p>
                 </div>
                 <button
@@ -319,43 +319,6 @@ import { formatParticipantCount, getAvatarTone, getInitials } from '../../shared
                   />
                 </div>
 
-                <div>
-                  <label for="group-pin" class="block text-sm font-semibold text-ink-900 mb-1.5">
-                    PIN de Entrada do Grupo (4 a 6 dígitos)
-                  </label>
-                  <div class="relative flex items-center">
-                    <input
-                      id="group-pin"
-                      data-testid="group-pin-input"
-                      [type]="showGroupPin() ? 'text' : 'password'"
-                      inputmode="numeric"
-                      maxlength="6"
-                      formControlName="groupPin"
-                      placeholder="Ex: 1234"
-                      class="w-full min-h-12 rounded-xl border border-stone-300 bg-white pl-3.5 pr-12 py-2.5 text-lg tracking-widest tabular-nums text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
-                    />
-                    <button
-                      type="button"
-                      (click)="showGroupPin.set(!showGroupPin())"
-                      aria-label="Mostrar ou ocultar PIN do grupo"
-                      class="absolute right-1 min-w-11 min-h-11 rounded-lg flex items-center justify-center text-ink-600 hover:text-pine-900 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-                    >
-                      <app-festive-icon [name]="showGroupPin() ? 'eye-off' : 'eye'" svgClass="w-5 h-5" />
-                    </button>
-                  </div>
-                  <p class="text-xs text-ink-600 mt-1">
-                    Os participantes precisarão informar este PIN para entrar no grupo.
-                  </p>
-                  @if (
-                    (createGroupForm.controls.groupPin.touched || createGroupForm.controls.groupPin.dirty) &&
-                    createGroupForm.controls.groupPin.invalid
-                  ) {
-                    <p class="text-xs text-cranberry-700 font-medium mt-1">
-                      Informe um PIN numérico de 4 a 6 dígitos.
-                    </p>
-                  }
-                </div>
-
                 <div class="flex flex-col sm:flex-row gap-2">
                   <button
                     type="submit"
@@ -392,7 +355,6 @@ export class HomeGroupsPageComponent implements OnInit {
   private readonly fb = inject(NonNullableFormBuilder);
 
   readonly showLoginPin = signal<boolean>(false);
-  readonly showGroupPin = signal<boolean>(false);
   readonly myGroups = signal<GroupSummaryView[]>([]);
   readonly isSubmitting = signal<boolean>(false);
   readonly creatingGroup = signal<boolean>(false);
@@ -406,8 +368,7 @@ export class HomeGroupsPageComponent implements OnInit {
   });
 
   readonly createGroupForm = this.fb.group({
-    eventName: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(100)]],
-    groupPin: ['', [Validators.required, Validators.pattern(/^\d{4,6}$/)]]
+    eventName: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(100)]]
   });
 
   constructor() {
@@ -438,14 +399,12 @@ export class HomeGroupsPageComponent implements OnInit {
 
   openCreateGroupModal(): void {
     this.errorMessage.set(null);
-    this.showGroupPin.set(false);
     this.isCreateGroupModalOpen.set(true);
   }
 
   closeCreateGroupModal(): void {
     this.isCreateGroupModalOpen.set(false);
     this.errorMessage.set(null);
-    this.showGroupPin.set(false);
     this.createGroupForm.reset();
   }
 
@@ -497,25 +456,18 @@ export class HomeGroupsPageComponent implements OnInit {
     this.errorMessage.set(null);
     this.statusMessage.set(null);
     const eventName = this.createGroupForm.controls.eventName.value.trim();
-    const groupPin = this.createGroupForm.controls.groupPin.value.trim();
 
     if (eventName.length < 3 || eventName.length > 100) {
       this.errorMessage.set('O nome do evento deve ter entre 3 e 100 caracteres.');
       return;
     }
 
-    if (!/^\d{4,6}$/.test(groupPin)) {
-      this.errorMessage.set('Informe um PIN numérico de 4 a 6 dígitos para o grupo.');
-      return;
-    }
-
     this.isSubmitting.set(true);
     this.creatingGroup.set(true);
-    this.apiService.createGroup({ eventName, groupPin }).subscribe({
+    this.apiService.createGroup({ eventName }).subscribe({
       next: (created) => {
         this.isSubmitting.set(false);
         this.creatingGroup.set(false);
-        this.showGroupPin.set(false);
         this.createGroupForm.reset();
         this.isCreateGroupModalOpen.set(false);
         this.statusMessage.set(`Grupo "${created.eventName}" criado com sucesso!`);
@@ -536,7 +488,6 @@ export class HomeGroupsPageComponent implements OnInit {
     this.errorMessage.set(null);
     this.statusMessage.set(null);
     this.showLoginPin.set(false);
-    this.showGroupPin.set(false);
     this.loginForm.reset();
   }
 }

@@ -2,9 +2,9 @@ package com.secretsanta.infrastructure.persistence;
 
 import com.secretsanta.domain.model.GeoCoordinates;
 import com.secretsanta.domain.model.GroupStatus;
+import com.secretsanta.domain.model.InviteSignature;
 import com.secretsanta.domain.model.Participant;
 import com.secretsanta.domain.model.ParticipantName;
-import com.secretsanta.domain.model.PinHash;
 import com.secretsanta.domain.model.SecretSantaGroup;
 import com.secretsanta.domain.model.Username;
 import com.secretsanta.domain.port.SecretSantaGroupRepository;
@@ -54,7 +54,7 @@ public class MongoSecretSantaGroupAdapter implements SecretSantaGroupRepository 
         return new SecretSantaGroupDocument(
                 group.id().toString(),
                 group.eventName(),
-                group.groupPinHash().value(),
+                group.inviteSignature().value(),
                 group.organizerUserId().toString(),
                 group.status().name(),
                 group.geographicRestrictionRelaxed(),
@@ -72,7 +72,7 @@ public class MongoSecretSantaGroupAdapter implements SecretSantaGroupRepository 
         return SecretSantaGroup.reconstitute(
                 UUID.fromString(doc.getId()),
                 doc.getEventName(),
-                new PinHash(doc.getGroupPinHash()),
+                new InviteSignature(doc.getInviteSignature()),
                 UUID.fromString(doc.getOrganizerUserId()),
                 GroupStatus.valueOf(doc.getStatus()),
                 doc.isGeographicRestrictionRelaxed(),

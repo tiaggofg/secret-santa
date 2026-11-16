@@ -16,7 +16,7 @@ public class SecretSantaGroupDocument {
 
     private String eventName;
 
-    private String groupPinHash;
+    private String inviteSignature;
 
     @Indexed(name = "organizerUserId")
     private String organizerUserId;
@@ -40,7 +40,7 @@ public class SecretSantaGroupDocument {
     public SecretSantaGroupDocument(
             String id,
             String eventName,
-            String groupPinHash,
+            String inviteSignature,
             String organizerUserId,
             String status,
             boolean geographicRestrictionRelaxed,
@@ -50,7 +50,7 @@ public class SecretSantaGroupDocument {
             List<ParticipantSubDocument> participants) {
         this.id = id;
         this.eventName = eventName;
-        this.groupPinHash = groupPinHash;
+        this.inviteSignature = inviteSignature;
         this.organizerUserId = organizerUserId;
         this.status = status;
         this.geographicRestrictionRelaxed = geographicRestrictionRelaxed;
@@ -76,12 +76,12 @@ public class SecretSantaGroupDocument {
         this.eventName = eventName;
     }
 
-    public String getGroupPinHash() {
-        return groupPinHash;
+    public String getInviteSignature() {
+        return inviteSignature;
     }
 
-    public void setGroupPinHash(String groupPinHash) {
-        this.groupPinHash = groupPinHash;
+    public void setInviteSignature(String inviteSignature) {
+        this.inviteSignature = inviteSignature;
     }
 
     public String getOrganizerUserId() {

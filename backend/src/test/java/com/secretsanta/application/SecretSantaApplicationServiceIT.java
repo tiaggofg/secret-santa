@@ -18,7 +18,7 @@ import com.secretsanta.domain.exception.DuplicateUsernameException;
 import com.secretsanta.domain.exception.GroupAlreadyDrawnException;
 import com.secretsanta.domain.exception.GroupNotDrawnYetException;
 import com.secretsanta.domain.exception.InvalidCredentialsException;
-import com.secretsanta.domain.exception.InvalidGroupPinException;
+import com.secretsanta.domain.exception.InvalidInviteSignatureException;
 import com.secretsanta.domain.exception.InvalidPasswordResetTokenException;
 import com.secretsanta.domain.exception.UnauthorizedOrganizerAccessException;
 import com.secretsanta.domain.model.GroupStatus;
@@ -83,6 +83,13 @@ class SecretSantaApplicationServiceIT {
         mongoTemplate.dropCollection(UserAccountDocument.class);
         mongoTemplate.dropCollection(SecretSantaGroupDocument.class);
         indexesChangeUnit.ensureIndexes();
+    }
+
+    private static String extractSig(AdminGroupView group) {
+        String sharePath = group.sharePath();
+        int idx = sharePath.indexOf("?sig=");
+        assertThat(idx).isGreaterThan(0);
+        return sharePath.substring(idx + 5);
     }
 
     @Test
@@ -154,22 +161,23 @@ class SecretSantaApplicationServiceIT {
         AuthSessionView carol = applicationService.registerUser("Carol", "carol", "1234");
         AuthSessionView dave = applicationService.registerUser("Dave", "dave", "1234");
 
-        // Group 1: Alice is organizer and participant (no groupPin needed for organizer)
-        AdminGroupView group1 = applicationService.createGroup(alice.userId(), "Natal Família Alice", "1234");
+        // Group 1: Alice is organizer and participant (no inviteSignature needed for organizer)
+        AdminGroupView group1 = applicationService.createGroup(alice.userId(), "Natal Família Alice");
         applicationService.registerParticipant(group1.id(), alice.userId(), null, -23.42, -51.93);
 
-        // Group 2: Bob is organizer, Alice joined as participant using groupPin
-        AdminGroupView group2 = applicationService.createGroup(bob.userId(), "Amigo Chocolate Bob", "5678");
-        applicationService.registerParticipant(group2.id(), alice.userId(), "5678", null, null);
+        // Group 2: Bob is organizer, Alice joined as participant using inviteSignature
+        AdminGroupView group2 = applicationService.createGroup(bob.userId(), "Amigo Chocolate Bob");
+        applicationService.registerParticipant(group2.id(), alice.userId(), extractSig(group2), null, null);
 
         // Group 3: Bob is organizer, status OPEN, Alice has NOT joined
-        applicationService.createGroup(bob.userId(), "Confraternização Privada", "9999");
+        applicationService.createGroup(bob.userId(), "Confraternização Privada");
 
         // Group 4: Bob is organizer, status DRAWN, Alice is NOT participant
-        AdminGroupView group4 = applicationService.createGroup(bob.userId(), "Grupo Já Sorteado", "4321");
+        AdminGroupView group4 = applicationService.createGroup(bob.userId(), "Grupo Já Sorteado");
+        String sig4 = extractSig(group4);
         applicationService.registerParticipant(group4.id(), bob.userId(), null, null, null);
-        applicationService.registerParticipant(group4.id(), carol.userId(), "4321", null, null);
-        applicationService.registerParticipant(group4.id(), dave.userId(), "4321", null, null);
+        applicationService.registerParticipant(group4.id(), carol.userId(), sig4, null, null);
+        applicationService.registerParticipant(group4.id(), dave.userId(), sig4, null, null);
         applicationService.executeDraw(group4.id(), bob.userId());
 
         GroupDiscoveryView discoveryForAlice = applicationService.listGroupsForUser(alice.userId());
@@ -184,14 +192,14 @@ class SecretSantaApplicationServiceIT {
         AuthSessionView organizer = applicationService.registerUser("Organizador", "org.user", "1234");
         AuthSessionView intruder = applicationService.registerUser("Intruso", "intruder.user", "1234");
 
-        AdminGroupView group = applicationService.createGroup(organizer.userId(), "Natal Protegido", "1234");
+        AdminGroupView group = applicationService.createGroup(organizer.userId(), "Natal Protegido");
         ParticipantRegistrationView joined = applicationService.registerParticipant(
-                group.id(), intruder.userId(), "1234", null, null);
+                group.id(), intruder.userId(), extractSig(group), null, null);
 
         assertThatThrownBy(() -> applicationService.getAdminGroup(group.id(), intruder.userId()))
                 .isInstanceOf(UnauthorizedOrganizerAccessException.class);
 
-        assertThatThrownBy(() -> applicationService.updateGroupPin(group.id(), intruder.userId(), "9999"))
+        assertThatThrownBy(() -> applicationService.rotateInviteSignature(group.id(), intruder.userId()))
                 .isInstanceOf(UnauthorizedOrganizerAccessException.class);
 
         assertThatThrownBy(() -> applicationService.removeParticipant(group.id(), intruder.userId(), joined.id()))
@@ -212,7 +220,8 @@ class SecretSantaApplicationServiceIT {
     void shouldRetryParticipantRegistrationOnOptimisticLockingFailureAndSucceed() {
         AuthSessionView organizer = applicationService.registerUser("Org", "org.retry", "1234");
         AuthSessionView member = applicationService.registerUser("Membro", "membro.retry", "1234");
-        AdminGroupView group = applicationService.createGroup(organizer.userId(), "Grupo Retry Otimista", "1234");
+        AdminGroupView group = applicationService.createGroup(organizer.userId(), "Grupo Retry Otimista");
+        String sig = extractSig(group);
 
         AtomicInteger saveAttempts = new AtomicInteger(0);
         SecretSantaGroupRepository flakyGroupRepository = new SecretSantaGroupRepository() {
@@ -245,7 +254,7 @@ class SecretSantaApplicationServiceIT {
                 Clock.systemUTC());
 
         ParticipantRegistrationView registration = serviceWithFlakyRepo.registerParticipant(
-                group.id(), member.userId(), "1234", -23.421, -51.933);
+                group.id(), member.userId(), sig, -23.421, -51.933);
 
         assertThat(saveAttempts.get()).isEqualTo(3);
         assertThat(registration.userId()).isEqualTo(member.userId());
@@ -259,11 +268,12 @@ class SecretSantaApplicationServiceIT {
         AuthSessionView u3 = applicationService.registerUser("U3", "user.three", "1234");
         AuthSessionView u4 = applicationService.registerUser("U4", "user.four", "1234");
 
-        AdminGroupView group = applicationService.createGroup(u1.userId(), "Natal Exclusão", "1234");
+        AdminGroupView group = applicationService.createGroup(u1.userId(), "Natal Exclusão");
+        String sig = extractSig(group);
         ParticipantRegistrationView p1 = applicationService.registerParticipant(group.id(), u1.userId(), null, null, null);
-        ParticipantRegistrationView p2 = applicationService.registerParticipant(group.id(), u2.userId(), "1234", null, null);
-        ParticipantRegistrationView p3 = applicationService.registerParticipant(group.id(), u3.userId(), "1234", null, null);
-        ParticipantRegistrationView p4 = applicationService.registerParticipant(group.id(), u4.userId(), "1234", null, null);
+        ParticipantRegistrationView p2 = applicationService.registerParticipant(group.id(), u2.userId(), sig, null, null);
+        ParticipantRegistrationView p3 = applicationService.registerParticipant(group.id(), u3.userId(), sig, null, null);
+        ParticipantRegistrationView p4 = applicationService.registerParticipant(group.id(), u4.userId(), sig, null, null);
 
         // Remove p4 while OPEN
         applicationService.removeParticipant(group.id(), u1.userId(), p4.id());
@@ -285,10 +295,11 @@ class SecretSantaApplicationServiceIT {
         AuthSessionView bia = applicationService.registerUser("Bia", "bia", "2222");
         AuthSessionView caio = applicationService.registerUser("Caio", "caio", "3333");
 
-        AdminGroupView group = applicationService.createGroup(ana.userId(), "Natal Revelação", "1234");
+        AdminGroupView group = applicationService.createGroup(ana.userId(), "Natal Revelação");
+        String sig = extractSig(group);
         applicationService.registerParticipant(group.id(), ana.userId(), null, -23.4200, -51.9300);
-        applicationService.registerParticipant(group.id(), bia.userId(), "1234", -23.4500, -51.9500);
-        applicationService.registerParticipant(group.id(), caio.userId(), "1234", -23.4800, -51.9800);
+        applicationService.registerParticipant(group.id(), bia.userId(), sig, -23.4500, -51.9500);
+        applicationService.registerParticipant(group.id(), caio.userId(), sig, -23.4800, -51.9800);
 
         // Reveal while OPEN must fail with GroupNotDrawnYetException
         assertThatThrownBy(() -> applicationService.revealMatch(group.id(), "ana", "1111"))
@@ -314,6 +325,7 @@ class SecretSantaApplicationServiceIT {
 
         PublicGroupView publicAfterReveal = applicationService.getPublicGroup(group.id(), ana.userId());
         assertThat(publicAfterReveal.participantsVisible()).isTrue();
+        assertThat(publicAfterReveal.inviteValid()).isTrue();
         assertThat(publicAfterReveal.participants())
                 .filteredOn(p -> p.username().equals("ana"))
                 .singleElement()
@@ -335,9 +347,9 @@ class SecretSantaApplicationServiceIT {
         AuthSessionView org = timeControlledService.registerUser("Organizador", "org.reset", "1234");
         AuthSessionView lucas = timeControlledService.registerUser("Lucas", "lucas.silva", "1111");
 
-        AdminGroupView group = timeControlledService.createGroup(org.userId(), "Natal Reset PIN", "1234");
+        AdminGroupView group = timeControlledService.createGroup(org.userId(), "Natal Reset PIN");
         ParticipantRegistrationView lucasParticipant = timeControlledService.registerParticipant(
-                group.id(), lucas.userId(), "1234", null, null);
+                group.id(), lucas.userId(), extractSig(group), null, null);
 
         PasswordResetLinkView resetLink = timeControlledService.generatePasswordResetToken(
                 group.id(), org.userId(), lucasParticipant.id());
@@ -361,8 +373,9 @@ class SecretSantaApplicationServiceIT {
     }
 
     @Test
-    void shouldNeverExposeDrawnParticipantIdPinHashOrResetTokenHashInAnyViewDto() throws Exception {
-        Set<String> forbiddenFields = Set.of("drawnParticipantId", "pinHash", "groupPinHash", "resetTokenHash");
+    void shouldNeverExposeDrawnParticipantIdPinHashResetTokenHashOrInviteSignatureInPublicView() throws Exception {
+        Set<String> forbiddenFields = Set.of(
+                "drawnParticipantId", "pinHash", "groupPinHash", "resetTokenHash", "inviteSignature");
         List<Class<?>> dtoClasses = List.of(
                 AuthSessionView.class,
                 SecretSantaApplicationService.GroupSummaryView.class,
@@ -389,10 +402,11 @@ class SecretSantaApplicationServiceIT {
         AuthSessionView u2 = applicationService.registerUser("P2", "p2.sec", "2345");
         AuthSessionView u3 = applicationService.registerUser("P3", "p3.sec", "3456");
 
-        AdminGroupView group = applicationService.createGroup(u1.userId(), "Grupo Sigilo", "1234");
+        AdminGroupView group = applicationService.createGroup(u1.userId(), "Grupo Sigilo");
+        String sig = extractSig(group);
         applicationService.registerParticipant(group.id(), u1.userId(), null, null, null);
-        applicationService.registerParticipant(group.id(), u2.userId(), "1234", null, null);
-        applicationService.registerParticipant(group.id(), u3.userId(), "1234", null, null);
+        applicationService.registerParticipant(group.id(), u2.userId(), sig, null, null);
+        applicationService.registerParticipant(group.id(), u3.userId(), sig, null, null);
 
         AdminGroupView drawnAdminView = applicationService.executeDraw(group.id(), u1.userId());
         PublicGroupView drawnPublicView = applicationService.getPublicGroup(group.id(), u1.userId());
@@ -401,24 +415,26 @@ class SecretSantaApplicationServiceIT {
         String publicJson = objectMapper.writeValueAsString(drawnPublicView);
 
         assertThat(adminJson).doesNotContain("drawnParticipantId", "pinHash", "groupPinHash", "resetTokenHash");
-        assertThat(publicJson).doesNotContain("drawnParticipantId", "pinHash", "groupPinHash", "resetTokenHash");
+        assertThat(publicJson).doesNotContain(
+                "drawnParticipantId", "pinHash", "groupPinHash", "resetTokenHash", "inviteSignature", sig);
     }
 
     @Test
-    void shouldSupportDirectVisitorRegistrationAndGroupJoinAndAvoidOrphanUserOnWrongGroupPin() {
+    void shouldSupportDirectVisitorRegistrationWithValidInviteSignatureAndAvoidOrphanUserOnInvalidSignature() {
         AuthSessionView org = applicationService.registerUser("Organizador", "org.whats", "1234");
-        AdminGroupView group = applicationService.createGroup(org.userId(), "Grupo Link WhatsApp", "7788");
+        AdminGroupView group = applicationService.createGroup(org.userId(), "Grupo Link WhatsApp");
+        String sig = extractSig(group);
 
-        // Wrong group PIN must fail BEFORE creating user account
+        // Wrong or missing inviteSignature must fail BEFORE creating user account
         assertThatThrownBy(() -> applicationService.registerVisitorAndJoinGroup(
                         group.id(),
                         "Orphan User",
                         "orphan.user",
                         "4321",
-                        "0000",
+                        "invalid_signature_1234567890",
                         -23.42,
                         -51.93))
-                .isInstanceOf(InvalidGroupPinException.class);
+                .isInstanceOf(InvalidInviteSignatureException.class);
 
         assertThat(userAccountRepository.findByUsername(new Username("orphan.user"))).isEmpty();
 
@@ -427,7 +443,7 @@ class SecretSantaApplicationServiceIT {
                 "Tia Maria",
                 "tia.maria",
                 "4321",
-                "7788",
+                sig,
                 -23.42,
                 -51.93);
 
@@ -438,7 +454,33 @@ class SecretSantaApplicationServiceIT {
 
         // Trying to join the same group again must fail with DuplicateParticipantException
         assertThatThrownBy(() -> applicationService.registerParticipant(
-                        group.id(), joinedVisitor.userId(), "7788", null, null))
+                        group.id(), joinedVisitor.userId(), sig, null, null))
                 .isInstanceOf(DuplicateParticipantException.class);
+    }
+
+    @Test
+    void shouldRotateInviteSignatureInvalidatingPreviousLinkImmediately() {
+        AuthSessionView org = applicationService.registerUser("Organizador", "org.rot", "1234");
+        AuthSessionView guest = applicationService.registerUser("Convidado", "guest.rot", "1234");
+
+        AdminGroupView created = applicationService.createGroup(org.userId(), "Grupo Rotação");
+        String oldSig = extractSig(created);
+
+        assertThat(applicationService.getPublicGroup(created.id(), null, oldSig).inviteValid()).isTrue();
+
+        AdminGroupView rotated = applicationService.rotateInviteSignature(created.id(), org.userId());
+        String newSig = extractSig(rotated);
+        assertThat(newSig).isNotEqualTo(oldSig);
+
+        assertThat(applicationService.getPublicGroup(created.id(), null, oldSig).inviteValid()).isFalse();
+        assertThat(applicationService.getPublicGroup(created.id(), null, newSig).inviteValid()).isTrue();
+
+        assertThatThrownBy(() -> applicationService.registerParticipant(
+                        created.id(), guest.userId(), oldSig, null, null))
+                .isInstanceOf(InvalidInviteSignatureException.class);
+
+        ParticipantRegistrationView joined = applicationService.registerParticipant(
+                created.id(), guest.userId(), newSig, null, null);
+        assertThat(joined.userId()).isEqualTo(guest.userId());
     }
 }

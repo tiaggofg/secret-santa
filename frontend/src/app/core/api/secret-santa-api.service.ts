@@ -1,5 +1,5 @@
 import { inject, Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthSessionStore } from '../auth/auth-session.store';
@@ -17,8 +17,7 @@ import {
   RegisterUserRequest,
   ResetPinRequest,
   RevealMatchRequest,
-  RevealMatchView,
-  UpdateGroupPinRequest
+  RevealMatchView
 } from './secret-santa-api.models';
 
 @Injectable({
@@ -53,9 +52,14 @@ export class SecretSantaApiService {
     });
   }
 
-  getPublicGroup(groupId: string): Observable<PublicGroupView> {
+  getPublicGroup(groupId: string, sig?: string | null): Observable<PublicGroupView> {
+    let params = new HttpParams();
+    if (sig && sig.trim().length > 0) {
+      params = params.set('sig', sig.trim());
+    }
     return this.http.get<PublicGroupView>(`${this.baseUrl}/groups/${encodeURIComponent(groupId)}`, {
-      headers: this.buildAuthHeaders()
+      headers: this.buildAuthHeaders(),
+      params
     });
   }
 
@@ -82,10 +86,10 @@ export class SecretSantaApiService {
     });
   }
 
-  updateGroupPin(groupId: string, request: UpdateGroupPinRequest): Observable<void> {
-    return this.http.put<void>(
-      `${this.baseUrl}/groups/${encodeURIComponent(groupId)}/admin/pin`,
-      request,
+  rotateInviteLink(groupId: string): Observable<AdminGroupView> {
+    return this.http.post<AdminGroupView>(
+      `${this.baseUrl}/groups/${encodeURIComponent(groupId)}/admin/invite-link/rotate`,
+      {},
       {
         headers: this.buildAuthHeaders()
       }

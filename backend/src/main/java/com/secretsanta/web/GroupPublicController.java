@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -47,13 +48,14 @@ public class GroupPublicController {
     @ResponseStatus(HttpStatus.OK)
     public PublicGroupView getPublicGroup(
             @PathVariable("groupId") String groupIdRaw,
+            @RequestParam(value = "sig", required = false) String inviteSignature,
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader) {
         UUID groupId = parseGroupId(groupIdRaw);
         UUID currentUserId = null;
         if (authorizationHeader != null && !authorizationHeader.isBlank()) {
             currentUserId = tokenService.parseAndValidate(authorizationHeader).userId();
         }
-        return applicationService.getPublicGroup(groupId, currentUserId);
+        return applicationService.getPublicGroup(groupId, currentUserId, inviteSignature);
     }
 
     @PostMapping("/{groupId}/participants")
@@ -65,11 +67,11 @@ public class GroupPublicController {
         UUID groupId = parseGroupId(groupIdRaw);
         Double latitude = request != null ? request.latitude() : null;
         Double longitude = request != null ? request.longitude() : null;
-        String groupPin = request != null ? request.groupPin() : null;
+        String inviteSignature = request != null ? request.inviteSignature() : null;
 
         if (authorizationHeader != null && !authorizationHeader.isBlank()) {
             AuthenticatedUser user = tokenService.parseAndValidate(authorizationHeader);
-            return applicationService.registerParticipant(groupId, user.userId(), groupPin, latitude, longitude);
+            return applicationService.registerParticipant(groupId, user.userId(), inviteSignature, latitude, longitude);
         }
 
         if (request != null
@@ -80,7 +82,7 @@ public class GroupPublicController {
                     request.name(),
                     request.username(),
                     request.pin(),
-                    groupPin,
+                    inviteSignature,
                     latitude,
                     longitude);
         }
@@ -112,7 +114,7 @@ public class GroupPublicController {
             String name,
             String username,
             String pin,
-            String groupPin,
+            String inviteSignature,
             Double latitude,
             Double longitude) {
     }

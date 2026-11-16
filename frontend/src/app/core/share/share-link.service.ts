@@ -9,8 +9,14 @@ export interface ShareResult {
   providedIn: 'root'
 })
 export class ShareLinkService {
-  async shareLink(options: { title: string; text?: string; pathOrUrl: string }): Promise<ShareResult> {
+  async shareLink(options: {
+    title: string;
+    text?: string;
+    pathOrUrl: string;
+    openWhatsAppFallback?: boolean;
+  }): Promise<ShareResult> {
     const fullUrl = this.toAbsoluteUrl(options.pathOrUrl);
+    const fullMessage = options.text ? `${options.text}\n${fullUrl}` : fullUrl;
     const nav = typeof navigator !== 'undefined' ? navigator : undefined;
 
     if (nav && typeof nav.share === 'function') {
@@ -26,6 +32,32 @@ export class ShareLinkService {
       }
     }
 
+    if (nav?.clipboard && typeof nav.clipboard.writeText === 'function') {
+      await nav.clipboard.writeText(fullMessage);
+    }
+
+    if (
+      options.openWhatsAppFallback &&
+      typeof window !== 'undefined' &&
+      typeof window.open === 'function'
+    ) {
+      try {
+        window.open(
+          `https://wa.me/?text=${encodeURIComponent(fullMessage)}`,
+          '_blank',
+          'noopener,noreferrer'
+        );
+      } catch {
+        // Ignore popup blocker or test environment limitations
+      }
+    }
+
+    return { method: 'clipboard', url: fullUrl };
+  }
+
+  async copyUrl(pathOrUrl: string): Promise<ShareResult> {
+    const fullUrl = this.toAbsoluteUrl(pathOrUrl);
+    const nav = typeof navigator !== 'undefined' ? navigator : undefined;
     if (nav?.clipboard && typeof nav.clipboard.writeText === 'function') {
       await nav.clipboard.writeText(fullUrl);
     }

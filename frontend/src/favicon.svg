@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <rect width="64" height="64" rx="16" fill="#14532D"/>
+  <!-- Sparkles -->
+  <path d="M52 10L53.5 14.5L58 16L53.5 17.5L52 22L50.5 17.5L46 16L50.5 14.5L52 10Z" fill="#FDE68A"/>
+  <!-- Ribbon Bows -->
+  <path d="M32 22C32 22 21 12 16 17C11 22 22 25 32 22Z" stroke="#D97706" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="#FEF3C7"/>
+  <path d="M32 22C32 22 43 12 48 17C53 22 42 25 32 22Z" stroke="#D97706" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="#FEF3C7"/>
+  <!-- Gift Lid -->
+  <rect x="10" y="22" width="44" height="10" rx="3" fill="#991B1B" stroke="#FDE68A" stroke-width="2"/>
+  <!-- Gift Body -->
+  <rect x="14" y="32" width="36" height="22" rx="4" fill="#991B1B" stroke="#FDE68A" stroke-width="2"/>
+  <!-- Vertical Gold Ribbon -->
+  <rect x="28" y="22" width="8" height="32" fill="#D97706"/>
+  <!-- Horizontal Gold Ribbon -->
+  <rect x="14" y="39" width="36" height="6" fill="#D97706"/>
+</svg>
