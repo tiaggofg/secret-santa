@@ -103,18 +103,20 @@ describe('AdminDashboardPageComponent', () => {
     fixture.detectChanges();
   });
 
-  it('renders group status, signed sharePath, participants, GPS status and human reveal status without Alterar PIN do Grupo or secret fields', () => {
+  it('renders group status, participants, GPS status and human reveal status without exposing technical invite URL or secret fields', () => {
     const text = fixture.nativeElement.textContent;
     expect(text).toContain('Natal Família Silva');
-    expect(text).toContain(signedSharePath);
+    expect(text).not.toContain(signedSharePath);
+    expect(fixture.nativeElement.querySelector('[data-testid="signed-share-path"]')).toBeNull();
     expect(text).toContain('@tiago.silva');
     expect(text).toContain('@maria.silva');
     expect(text).toContain('@lucas.silva');
-    expect(text).toContain('GPS Ativo (50m)');
+    expect(text).toContain('GPS 50m');
     expect(text).toContain('Sem GPS');
     expect(text).toContain('Inscrições Abertas');
     expect(text).toContain('Aguardando sorteio');
     expect(text).toContain('Convidar pelo WhatsApp');
+    expect(text).toContain('Copiar Link');
     expect(text).toContain('Gerar Novo Link de Convite');
     expect(text).not.toContain('Alterar PIN do Grupo');
     expect(text).not.toContain('WAITING_DRAW');
@@ -124,7 +126,23 @@ describe('AdminDashboardPageComponent', () => {
     expect(text.toLowerCase()).not.toContain('username');
   });
 
-  it('shares the signed group WhatsApp link with exact message and copies URL via copyUrl', async () => {
+  it('shows friendly missing-participants hint and disables draw button when fewer than 3 participants are enrolled', () => {
+    apiMock.getAdminGroup.mockReturnValue(
+      of({
+        ...sampleOpenGroup,
+        participants: sampleOpenGroup.participants.slice(0, 2)
+      })
+    );
+    component.loadAdminGroup();
+    fixture.detectChanges();
+
+    const hint = fixture.nativeElement.querySelector('[data-testid="min-participants-hint"]');
+    const drawBtn: HTMLButtonElement = fixture.nativeElement.querySelector('[data-testid="execute-draw-btn"]');
+    expect(hint?.textContent).toContain('Falta 1 participante para liberar o sorteio.');
+    expect(drawBtn.disabled).toBe(true);
+  });
+
+  it('shares the signed group WhatsApp link and copies URL via Copiar Link with concise toasts (no raw URL exposed)', async () => {
     const shareBtn: HTMLButtonElement = fixture.nativeElement.querySelector(
       '[data-testid="share-group-link-btn"]'
     );
@@ -140,20 +158,26 @@ describe('AdminDashboardPageComponent', () => {
       openWhatsAppFallback: true
     });
     const toastService = TestBed.inject(ToastService);
-    expect(toastService.toasts().some((t) => t.message.includes(signedSharePath))).toBe(true);
+    expect(toastService.toasts().some((t) => t.message.includes('Convite copiado!'))).toBe(true);
+    expect(toastService.toasts().some((t) => t.message.includes(signedSharePath))).toBe(false);
     toastService.clear();
 
     const copyBtn: HTMLButtonElement = fixture.nativeElement.querySelector(
       '[data-testid="copy-group-link-btn"]'
     );
+    expect(copyBtn.textContent).toContain('Copiar Link');
     copyBtn.click();
     await fixture.whenStable();
     fixture.detectChanges();
 
     expect(shareMock.copyUrl).toHaveBeenCalledWith(signedSharePath);
+    expect(copyBtn.textContent).toContain('Copiado!');
+    expect(toastService.toasts().some((t) => t.message === 'Link de convite copiado!')).toBe(true);
+    expect(toastService.toasts().some((t) => t.message.includes(signedSharePath))).toBe(false);
+    toastService.clear();
   });
 
-  it('rotates the group invite link via POST /admin/invite-link/rotate and displays invalidation feedback', () => {
+  it('requires inline confirmation before rotating the group invite link', () => {
     const rotatedPath = `/g/${groupId}?sig=sig_new_rotated_999`;
     apiMock.rotateInviteLink.mockReturnValue(
       of({
@@ -168,10 +192,27 @@ describe('AdminDashboardPageComponent', () => {
     rotateBtn.click();
     fixture.detectChanges();
 
-    expect(apiMock.rotateInviteLink).toHaveBeenCalledWith(groupId);
-    expect(fixture.nativeElement.querySelector('[data-testid="signed-share-path"]')?.textContent).toContain(
-      rotatedPath
+    expect(apiMock.rotateInviteLink).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.querySelector('[data-testid="rotate-invite-confirm"]')).not.toBeNull();
+
+    const cancelBtn: HTMLButtonElement = fixture.nativeElement.querySelector(
+      '[data-testid="cancel-rotate-invite-btn"]'
     );
+    cancelBtn.click();
+    fixture.detectChanges();
+    expect(apiMock.rotateInviteLink).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.querySelector('[data-testid="rotate-invite-confirm"]')).toBeNull();
+
+    fixture.nativeElement.querySelector('[data-testid="rotate-invite-link-btn"]').click();
+    fixture.detectChanges();
+    const confirmBtn: HTMLButtonElement = fixture.nativeElement.querySelector(
+      '[data-testid="confirm-rotate-invite-btn"]'
+    );
+    confirmBtn.click();
+    fixture.detectChanges();
+
+    expect(apiMock.rotateInviteLink).toHaveBeenCalledWith(groupId);
+    expect(component.group()?.sharePath).toBe(rotatedPath);
     const toastService = TestBed.inject(ToastService);
     expect(
       toastService.toasts().some((t) => t.message.includes('Novo link de convite gerado! O link anterior foi invalidado.'))
@@ -179,20 +220,25 @@ describe('AdminDashboardPageComponent', () => {
     toastService.clear();
   });
 
-  it('generates and shares a one-time PIN reset link (/reset/{token}) for a participant', async () => {
+  it('generates reset card without exposing /reset/{token}, supports copy/share and dismisses cleanly', async () => {
+    const resetPath = '/reset/tok-reset-xyz';
     apiMock.generatePasswordResetToken.mockReturnValue(
       of({
         participantId: 'p-2',
         userId: 'u-2',
         username: 'maria.silva',
         resetToken: 'tok-reset-xyz',
-        resetPath: '/reset/tok-reset-xyz',
+        resetPath,
         expiresAt: '2026-11-14T18:00:00Z'
       })
     );
     shareMock.shareLink.mockResolvedValue({
       method: 'clipboard',
-      url: 'http://localhost:4200/reset/tok-reset-xyz'
+      url: `http://localhost:4200${resetPath}`
+    });
+    shareMock.copyUrl.mockResolvedValue({
+      method: 'clipboard',
+      url: `http://localhost:4200${resetPath}`
     });
 
     const resetBtns: NodeListOf<HTMLButtonElement> = fixture.nativeElement.querySelectorAll(
@@ -205,12 +251,45 @@ describe('AdminDashboardPageComponent', () => {
     expect(apiMock.generatePasswordResetToken).toHaveBeenCalledWith(groupId, 'p-2');
     expect(shareMock.shareLink).toHaveBeenCalledWith(
       expect.objectContaining({
-        pathOrUrl: '/reset/tok-reset-xyz'
+        pathOrUrl: resetPath
       })
     );
+
+    const card: HTMLElement | null = fixture.nativeElement.querySelector(
+      '[data-testid="generated-reset-link-card"]'
+    );
+    expect(card).not.toBeNull();
+    expect(card?.textContent).toContain('Link de Redefinição para @maria.silva');
+    expect(card?.textContent).not.toContain(resetPath);
+
+    const toastService = TestBed.inject(ToastService);
+    expect(toastService.toasts().some((t) => t.message.includes(resetPath))).toBe(false);
+    toastService.clear();
+
+    const copyResetBtn: HTMLButtonElement = fixture.nativeElement.querySelector(
+      '[data-testid="copy-reset-link-btn"]'
+    );
+    copyResetBtn.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(shareMock.copyUrl).toHaveBeenCalledWith(resetPath);
+    expect(copyResetBtn.textContent).toContain('Copiado!');
+    expect(
+      toastService.toasts().some((t) => t.message === 'Link de redefinição copiado para @maria.silva!')
+    ).toBe(true);
+    toastService.clear();
+
+    const dismissBtn: HTMLButtonElement = fixture.nativeElement.querySelector(
+      '[data-testid="dismiss-reset-link-btn"]'
+    );
+    dismissBtn.click();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('[data-testid="generated-reset-link-card"]')).toBeNull();
   });
 
-  it('removes a participant while group is OPEN and refreshes participant list', () => {
+  it('requires inline confirmation before removing a participant while group is OPEN', () => {
     apiMock.removeParticipant.mockReturnValue(of(void 0));
 
     const removeBtns: NodeListOf<HTMLButtonElement> = fixture.nativeElement.querySelectorAll(
@@ -219,19 +298,40 @@ describe('AdminDashboardPageComponent', () => {
     removeBtns[0].click();
     fixture.detectChanges();
 
+    expect(apiMock.removeParticipant).not.toHaveBeenCalled();
+    const confirmBox = fixture.nativeElement.querySelector('[data-testid="remove-participant-confirm"]');
+    expect(confirmBox?.textContent).toContain('Remover Tiago Silva do grupo?');
+
+    const cancelBtn: HTMLButtonElement = fixture.nativeElement.querySelector(
+      '[data-testid="cancel-remove-participant-btn"]'
+    );
+    cancelBtn.click();
+    fixture.detectChanges();
+    expect(apiMock.removeParticipant).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.querySelector('[data-testid="remove-participant-confirm"]')).toBeNull();
+
+    fixture.nativeElement.querySelectorAll('[data-testid="remove-participant-btn"]')[0].click();
+    fixture.detectChanges();
+
+    const confirmBtn: HTMLButtonElement = fixture.nativeElement.querySelector(
+      '[data-testid="confirm-remove-participant-btn"]'
+    );
+    confirmBtn.click();
+    fixture.detectChanges();
+
     expect(apiMock.removeParticipant).toHaveBeenCalledWith(groupId, 'p-1');
     expect(apiMock.getAdminGroup).toHaveBeenCalledTimes(2);
   });
 
-  it('executes the draw after inline confirmation when >= 3 participants are registered', () => {
+  it('executes the draw after inline confirmation, hides invite card and shows reveal progress in DRAWN state', () => {
     const drawnGroup: AdminGroupView = {
       ...sampleOpenGroup,
       status: 'DRAWN',
       geographicRestrictionRelaxed: true,
       drawnAt: '2026-11-13T19:00:00Z',
-      participants: sampleOpenGroup.participants.map((p) => ({
+      participants: sampleOpenGroup.participants.map((p, index) => ({
         ...p,
-        revealStatus: 'PENDING_REVEAL'
+        revealStatus: index === 0 ? 'REVEALED' : 'PENDING_REVEAL'
       }))
     };
     apiMock.executeDraw.mockReturnValue(of(drawnGroup));
@@ -250,6 +350,15 @@ describe('AdminDashboardPageComponent', () => {
 
     expect(apiMock.executeDraw).toHaveBeenCalledWith(groupId);
     expect(component.group()?.status).toBe('DRAWN');
+    expect(fixture.nativeElement.querySelector('[data-testid="invite-card"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="share-group-link-btn"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="remove-participant-btn"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="reveal-progress-label"]')?.textContent).toContain(
+      '1 de 3 já descobriram'
+    );
+    expect(fixture.nativeElement.querySelector('[data-testid="reveal-progress-bar"]')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="geo-relaxed-badge"]')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="open-reveal-page-link"]')).not.toBeNull();
   });
 
   it('displays access denied error when non-organizer receives HTTP 403', () => {

@@ -30,7 +30,11 @@ flowchart TD
     RevealBtn --> RevealModal["Modal Efêmero<br/>(nome de usuário + PIN)"]
 
     Route -->|"/g/:groupId/admin"| AdminPage
-    AdminPage --> AdminActions["Copiar / Compartilhar Link<br/>Rotacionar Convite<br/>Remover Participante<br/>Executar Sorteio<br/>Gerar Link Reset PIN"]
+    AdminPage --> AdminState{"Status do grupo<br/>no Painel Admin?"}
+    AdminState -->|"OPEN"| AdminOpen["Convidar WhatsApp / Copiar Link<br/>Rotacionar Convite (confirmação)<br/>Remover Participante (confirmação)<br/>Executar Sorteio"]
+    AdminState -->|"DRAWN"| AdminDrawn["Barra de Progresso de Revelação<br/>Atalho Página de Revelação<br/>(Convite oculto)"]
+    AdminOpen --> AdminReset["Gerar / Enviar / Copiar<br/>Link Reset Senha"]
+    AdminDrawn --> AdminReset
 
     Route -->|"/reset/:token"| ResetPage["Formulário Novo PIN<br/>(4 a 6 dígitos)"]
 ```

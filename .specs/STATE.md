@@ -76,11 +76,11 @@
 
 ## Handoff
 
-- **Feature**: rejoin-redirect-and-auth-security (`.specs/features/rejoin-redirect-and-auth-security`)
-- **Phase / Task**: Implemented & Verified (`B1`..`B4`, `F1`..`F3`, `V1`..`V3`)
-- **Completed**: Backend (`PasswordValidator`, `RefreshToken`, `refresh_tokens` MongoDB + TTL, `AuthCookieManager`, `409 ALREADY_PARTICIPANT` com cookies, `CORS` `allowCredentials`), Frontend (`authCredentialsInterceptor`, `provideAppInitializer` `/auth/me`, `PasswordCriteriaIndicatorComponent`, política de senha forte, fix de re-ingresso `/g/:groupId`), Testes unitários/integração/Playwright E2E e Documentação (`README.md`, `docs/`)
+- **Feature**: admin-panel-refactor (`.specs/features/admin-panel-refactor`)
+- **Phase / Task**: Spec & Tasks Approved — Ready for Implementation (`F1`..`F5`, `V1`..`V3`)
+- **Completed**: Auditoria Playwright (`390x844` e `1280x800`), criação e aprovação de `.specs/features/admin-panel-refactor/spec.md` e `.specs/features/admin-panel-refactor/tasks.md`
 - **In-progress** (file:line): none
-- **Next step**: Aguardando aprovação explícita do usuário para `git commit` e `git push` (Seção 7 do `AGENTS.md`)
+- **Next step**: Iniciar implementação de `F1`..`F5` em `frontend/src/app/features/admin/` seguindo `.specs/features/admin-panel-refactor/spec.md` e `tasks.md`
 - **Blockers**: none
-- **Uncommitted files**: alterações da spec `rejoin-redirect-and-auth-security` em `backend/`, `frontend/`, `docs/`, `README.md` e `.specs/`
+- **Uncommitted files**: `.specs/features/admin-panel-refactor/spec.md`, `.specs/features/admin-panel-refactor/tasks.md`, `.specs/STATE.md`
 - **Branch**: main
