@@ -12,8 +12,10 @@ import com.secretsanta.domain.exception.InsufficientParticipantsForDrawException
 import com.secretsanta.domain.exception.InvalidCredentialsException;
 import com.secretsanta.domain.exception.InvalidInviteSignatureException;
 import com.secretsanta.domain.exception.InvalidPasswordResetTokenException;
+import com.secretsanta.domain.exception.InvalidRevealPasswordException;
 import com.secretsanta.domain.exception.ResourceNotFoundException;
 import com.secretsanta.domain.exception.UnauthorizedOrganizerAccessException;
+import com.secretsanta.domain.exception.UnauthorizedParticipantAccessException;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -60,6 +62,17 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void shouldMapInvalidRevealPasswordExceptionToHttp401Unauthorized() {
+        ProblemDetail problem = handler.handleInvalidRevealPassword(
+                new InvalidRevealPasswordException("Invalid password"));
+
+        assertThat(problem.getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED.value());
+        assertThat(problem.getTitle()).isEqualTo("Unauthorized");
+        assertThat(problem.getDetail()).isEqualTo("Invalid password");
+        assertThat(problem.getProperties()).containsEntry("errorCode", "INVALID_PASSWORD");
+    }
+
+    @Test
     void shouldMapInvalidInviteSignatureExceptionToHttp403Forbidden() {
         ProblemDetail problem = handler.handleInvalidInviteSignature(
                 new InvalidInviteSignatureException("Invalid or expired group invite link"));
@@ -79,6 +92,17 @@ class GlobalExceptionHandlerTest {
         assertThat(problem.getTitle()).isEqualTo("Forbidden");
         assertThat(problem.getDetail()).contains("group organizer");
         assertThat(problem.getProperties()).containsEntry("errorCode", "FORBIDDEN_ORGANIZER_ACCESS");
+    }
+
+    @Test
+    void shouldMapUnauthorizedParticipantAccessExceptionToHttp403Forbidden() {
+        ProblemDetail problem = handler.handleUnauthorizedParticipantAccess(
+                new UnauthorizedParticipantAccessException("Only registered participants of this group can perform this operation"));
+
+        assertThat(problem.getStatus()).isEqualTo(HttpStatus.FORBIDDEN.value());
+        assertThat(problem.getTitle()).isEqualTo("Forbidden");
+        assertThat(problem.getDetail()).contains("registered participants");
+        assertThat(problem.getProperties()).containsEntry("errorCode", "FORBIDDEN_PARTICIPANT_ACCESS");
     }
 
     @Test

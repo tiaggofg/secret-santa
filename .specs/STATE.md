@@ -74,13 +74,21 @@
 - **Date**: 2026-11-16
 - **Status**: active
 
+### AD-010
+- **Decision**: Restringir `POST /api/v1/groups/{groupId}/participants/reveal` ao usuário autenticado via cookie `HttpOnly` (`ss_access_token`), simplificando `RevealMatchRequest` para `{ "password": "..." }` com diferenciação explícita entre `401 INVALID_CREDENTIALS` (sessão ausente/expirada), `401 INVALID_PASSWORD` (senha incorreta) e `403 FORBIDDEN_PARTICIPANT_ACCESS` (não-membro); no Frontend, eliminar o *containing block* de `transform` em `<main>` (`animate-fade-slide-up` com `backwards`), centralizar modais na viewport (`flex p-4 overflow-y-auto` + `m-auto`) e reformular `/g/:groupId` no estado `DRAWN` para botão único `"Ver meu presente"` + modal de confirmação de senha + lista informativa não clicável com selo `"Você"` e copy `"Sigilo de Natal"`.
+- **Reason**: Impede tentativas de enumeração ou ataque de senha contra outros participantes no endpoint `/reveal`, corrige o deslocamento vertical do modal de revelação em grupos com muitos participantes e adapta a UX ao fluxo individual no próprio celular sem perder o sigilo efêmero em memória.
+- **Trade-off**: Visitantes deslogados precisam autenticar no card compacto de login antes de revelar o resultado, e usuários compartilhando aparelho usam `"Trocar de conta"` (`POST /auth/logout`).
+- **Scope**: Domínio (`SecretSantaGroup`, `InvalidRevealPasswordException`, `UnauthorizedParticipantAccessException`), API REST (`GroupPublicController`, `GlobalExceptionHandler`), Frontend (`AppComponent`, `styles.css`, `auth-credentials.interceptor`, `EphemeralRevealModalComponent`, `PublicGroupPageComponent`) e `docs/`.
+- **Date**: 2026-11-16
+- **Status**: active
+
 ## Handoff
 
-- **Feature**: admin-panel-refactor (`.specs/features/admin-panel-refactor`)
-- **Phase / Task**: Spec & Tasks Approved — Ready for Implementation (`F1`..`F5`, `V1`..`V3`)
-- **Completed**: Auditoria Playwright (`390x844` e `1280x800`), criação e aprovação de `.specs/features/admin-panel-refactor/spec.md` e `.specs/features/admin-panel-refactor/tasks.md`
+- **Feature**: reveal-modal-and-auth-contract (`.specs/features/reveal-modal-and-auth-contract`)
+- **Phase / Task**: Implemented & Verified (`B1`..`B3`, `F1`..`F4`, `V1`..`V3`) — Awaiting User Approval for Commit & Push
+- **Completed**: Contrato autenticado de `/reveal`, correção estrutural de `position: fixed` dos modais, nova UI `DRAWN` com botão único + modal de senha, `mvn test` (108/108), `npm test` (52/52), `npm run build`, validação E2E real via Playwright MCP (`390x844` e `1280x800` com 13 participantes) e atualização de `docs/`
 - **In-progress** (file:line): none
-- **Next step**: Iniciar implementação de `F1`..`F5` em `frontend/src/app/features/admin/` seguindo `.specs/features/admin-panel-refactor/spec.md` e `tasks.md`
+- **Next step**: Aguardar aprovação explícita do usuário para `git add`, `git commit` e `git push`
 - **Blockers**: none
-- **Uncommitted files**: `.specs/features/admin-panel-refactor/spec.md`, `.specs/features/admin-panel-refactor/tasks.md`, `.specs/STATE.md`
+- **Uncommitted files**: alterações de `reveal-modal-and-auth-contract` em `backend/`, `frontend/`, `docs/` e `.specs/`
 - **Branch**: main

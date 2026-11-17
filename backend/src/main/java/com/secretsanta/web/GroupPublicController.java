@@ -101,13 +101,12 @@ public class GroupPublicController {
     @ResponseStatus(HttpStatus.OK)
     public RevealMatchView revealMatch(
             @PathVariable("groupId") String groupIdRaw,
-            @RequestBody(required = false) RevealMatchRequest request) {
+            @RequestBody(required = false) RevealMatchRequest request,
+            HttpServletRequest httpRequest) {
+        AuthenticatedUser user = cookieManager.requireAuthenticatedUser(httpRequest);
         UUID groupId = parseGroupId(groupIdRaw);
-        if (request == null) {
-            return applicationService.revealMatch(groupId, null, null);
-        }
-        String effectivePassword = firstNonBlank(request.password(), request.pin());
-        return applicationService.revealMatch(groupId, request.username(), effectivePassword);
+        String rawPassword = request != null ? request.password() : null;
+        return applicationService.revealMatch(groupId, user.userId(), rawPassword);
     }
 
     static UUID parseGroupId(String groupIdRaw) {
@@ -135,9 +134,6 @@ public class GroupPublicController {
             Double longitude) {
     }
 
-    public record RevealMatchRequest(
-            String username,
-            String password,
-            String pin) {
+    public record RevealMatchRequest(String password) {
     }
 }

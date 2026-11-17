@@ -6,6 +6,7 @@ import com.secretsanta.domain.exception.GroupNotDrawnYetException;
 import com.secretsanta.domain.exception.InvalidCredentialsException;
 import com.secretsanta.domain.exception.InvalidInviteSignatureException;
 import com.secretsanta.domain.exception.InvalidPasswordResetTokenException;
+import com.secretsanta.domain.exception.InvalidRevealPasswordException;
 import com.secretsanta.domain.exception.ResourceNotFoundException;
 import com.secretsanta.domain.model.GeoCoordinates;
 import com.secretsanta.domain.model.GroupStatus;
@@ -516,38 +517,28 @@ public class SecretSantaApplicationService {
         return resetPasswordWithToken(rawToken, newRawPassword);
     }
 
-    public RevealMatchView revealMatch(UUID groupId, String usernameValue, String rawPassword) {
+    public RevealMatchView revealMatch(UUID groupId, UUID authenticatedUserId, String rawPassword) {
+        if (authenticatedUserId == null) {
+            throw new InvalidCredentialsException("Authentication required to reveal match");
+        }
+        if (rawPassword == null || rawPassword.isBlank()) {
+            throw new InvalidRevealPasswordException("Invalid password");
+        }
+
         OptimisticLockingFailureException lastFailure = null;
         for (int attempt = 1; attempt <= MAX_OPTIMISTIC_LOCK_RETRIES; attempt++) {
             try {
                 SecretSantaGroup group = loadGroupById(groupId);
+                Participant participant = group.requireParticipantByUserId(authenticatedUserId);
                 if (group.status() != GroupStatus.DRAWN) {
                     throw new GroupNotDrawnYetException("The Secret Santa draw has not been executed yet");
                 }
-                if (usernameValue == null || usernameValue.isBlank() || rawPassword == null || rawPassword.isBlank()) {
-                    throw new InvalidCredentialsException("Invalid username or password");
-                }
 
-                final Username username;
-                try {
-                    username = new Username(usernameValue);
-                } catch (DomainValidationException ex) {
-                    throw new InvalidCredentialsException("Invalid username or password");
-                }
-
-                final Participant participant;
-                try {
-                    participant = group.findParticipantByUsername(username);
-                } catch (ResourceNotFoundException ex) {
-                    throw new InvalidCredentialsException("Invalid username or password");
-                }
-
-                UserAccount userAccount = userAccountRepository.findById(participant.userId())
-                        .or(() -> userAccountRepository.findByUsername(username))
-                        .orElseThrow(() -> new InvalidCredentialsException("Invalid username or password"));
+                UserAccount userAccount = userAccountRepository.findById(authenticatedUserId)
+                        .orElseThrow(() -> new InvalidCredentialsException("Authenticated user account not found"));
 
                 if (!passwordEncoder.matches(rawPassword, userAccount.pinHash().value())) {
-                    throw new InvalidCredentialsException("Invalid username or password");
+                    throw new InvalidRevealPasswordException("Invalid password");
                 }
 
                 Instant now = Instant.now(clock);

@@ -45,16 +45,26 @@ function isApiRequest(url: string): boolean {
   return environment.apiUrl.length > 0 && url.startsWith(environment.apiUrl);
 }
 
-function shouldSkipAutoRefresh(req: HttpRequest<unknown>, isAuthenticated: boolean): boolean {
+function shouldSkipAutoRefresh(
+  req: HttpRequest<unknown>,
+  isAuthenticated: boolean,
+  err: HttpErrorResponse
+): boolean {
   const url = req.url;
   if (
     url.includes('/auth/login') ||
     url.includes('/auth/register') ||
     url.includes('/auth/refresh') ||
-    url.includes('/auth/logout') ||
-    url.includes('/participants/reveal')
+    url.includes('/auth/logout')
   ) {
     return true;
+  }
+  if (url.includes('/participants/reveal')) {
+    const errorCode =
+      err.error != null && typeof err.error === 'object'
+        ? (err.error as { errorCode?: unknown }).errorCode
+        : undefined;
+    return errorCode !== 'INVALID_CREDENTIALS';
   }
   if (url.includes('/participants')) {
     const body = req.body as Record<string, unknown> | null;
@@ -79,7 +89,7 @@ export const authCredentialsInterceptor: HttpInterceptorFn = (req, next) => {
       if (
         !(err instanceof HttpErrorResponse) ||
         err.status !== 401 ||
-        shouldSkipAutoRefresh(credentialedReq, authStore.isAuthenticated())
+        shouldSkipAutoRefresh(credentialedReq, authStore.isAuthenticated(), err)
       ) {
         return throwError(() => err);
       }

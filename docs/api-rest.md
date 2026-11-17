@@ -26,7 +26,7 @@ A autenticação web utiliza exclusivamente **cookies `HttpOnly`** (`ss_access_t
 | `GET` | `/api/v1/groups` | Cookie Access | `200` | Retorna `GroupDiscoveryView` com `myGroups` (grupos onde o usuário é organizador ou participante). |
 | `GET` | `/api/v1/groups/{groupId}?sig={sig}` | Opcional | `200` / `401` | Retorna `PublicGroupView`. Se houver cookie `ss_access_token` inválido/expirado, retorna `401` para acionar refresh automático. Só expõe `participants` (`participantsVisible: true`) a membros/organizadores. |
 | `POST` | `/api/v1/groups/{groupId}/participants` | Cookie ou Visitante | `201` / `409` | Inscreve usuário autenticado ou cadastra/autentica visitante (`inviteSignature`, `latitude`, `longitude`). Em login de visitante já inscrito, emite cookies `HttpOnly` e retorna `409` (`errorCode: "ALREADY_PARTICIPANT"` + `redirectPath`). |
-| `POST` | `/api/v1/groups/{groupId}/participants/reveal` | `username` + `password` | `200` | Valida credenciais no corpo da requisição, marca `REVEALED` na 1ª consulta e retorna `RevealMatchView` com `drawnParticipantName`. |
+| `POST` | `/api/v1/groups/{groupId}/participants/reveal` | Cookie Access + `password` | `200` / `401` / `403` / `409` | Exige cookie `ss_access_token` (`401 INVALID_CREDENTIALS` se ausente/expirado), valida inscrição do usuário autenticado no grupo (`403 FORBIDDEN_PARTICIPANT_ACCESS`), recebe apenas `{ "password": "..." }`, valida a senha BCrypt da conta autenticada (`401 INVALID_PASSWORD`), marca `REVEALED` na 1ª consulta e retorna `RevealMatchView` com `drawnParticipantName`. |
 
 ---
 

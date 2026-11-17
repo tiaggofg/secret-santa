@@ -69,7 +69,7 @@ describe('authCredentialsInterceptor', () => {
     expect(authStore.isAuthenticated()).toBe(false);
   });
 
-  it('should not trigger refresh on login or reveal 401 errors', () => {
+  it('should not trigger refresh on login or reveal INVALID_PASSWORD / empty 401 errors', () => {
     let loginErr = 0;
     http.post('/api/v1/auth/login', { username: 'a', password: 'b' }).subscribe({
       error: (err) => (loginErr = err.status)
@@ -78,12 +78,40 @@ describe('authCredentialsInterceptor', () => {
     expect(loginErr).toBe(401);
 
     let revealErr = 0;
-    http.post('/api/v1/groups/g1/participants/reveal', { username: 'a', password: 'b' }).subscribe({
+    http.post('/api/v1/groups/g1/participants/reveal', { password: 'wrong' }).subscribe({
       error: (err) => (revealErr = err.status)
     });
     httpMock
       .expectOne('/api/v1/groups/g1/participants/reveal')
-      .flush({}, { status: 401, statusText: 'Unauthorized' });
+      .flush({ errorCode: 'INVALID_PASSWORD' }, { status: 401, statusText: 'Unauthorized' });
     expect(revealErr).toBe(401);
+
+    let emptyRevealErr = 0;
+    http.post('/api/v1/groups/g1/participants/reveal', { password: 'wrong' }).subscribe({
+      error: (err) => (emptyRevealErr = err.status)
+    });
+    httpMock
+      .expectOne('/api/v1/groups/g1/participants/reveal')
+      .flush({}, { status: 401, statusText: 'Unauthorized' });
+    expect(emptyRevealErr).toBe(401);
+  });
+
+  it('should trigger refresh on reveal 401 when errorCode is INVALID_CREDENTIALS', () => {
+    let revealRes: unknown;
+    http.post('/api/v1/groups/g1/participants/reveal', { password: 'valid' }).subscribe((res) => {
+      revealRes = res;
+    });
+
+    httpMock
+      .expectOne('/api/v1/groups/g1/participants/reveal')
+      .flush({ errorCode: 'INVALID_CREDENTIALS' }, { status: 401, statusText: 'Unauthorized' });
+
+    const refreshReq = httpMock.expectOne('/api/v1/auth/refresh');
+    refreshReq.flush({ userId: 'u-1', name: 'Tiago', username: 'tiago' });
+
+    const retryReq = httpMock.expectOne('/api/v1/groups/g1/participants/reveal');
+    retryReq.flush({ drawnParticipantName: 'Maria' });
+
+    expect(revealRes).toEqual({ drawnParticipantName: 'Maria' });
   });
 });

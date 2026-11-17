@@ -10,6 +10,7 @@ import com.secretsanta.domain.exception.GroupNotDrawnYetException;
 import com.secretsanta.domain.exception.InsufficientParticipantsForDrawException;
 import com.secretsanta.domain.exception.ResourceNotFoundException;
 import com.secretsanta.domain.exception.UnauthorizedOrganizerAccessException;
+import com.secretsanta.domain.exception.UnauthorizedParticipantAccessException;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
@@ -169,5 +170,30 @@ class SecretSantaGroupTest {
         assertThat(group.findParticipantByUsername(new Username("ana")).revealedAt()).isEqualTo(revealTime);
         assertThat(group.findParticipantByUsername(new Username("ana")).revealStatus(group.status()))
                 .isEqualTo(RevealStatus.REVEALED);
+    }
+
+    @Test
+    void shouldRequireParticipantByUserIdAndThrowWhenNotRegistered() {
+        SecretSantaGroup group = SecretSantaGroup.create(
+                "Natal Família",
+                INVITE_SIGNATURE,
+                UUID.randomUUID(),
+                NOW);
+
+        UUID anaUserId = UUID.randomUUID();
+        Participant ana = group.registerParticipant(
+                anaUserId,
+                new ParticipantName("Ana"),
+                new Username("ana"),
+                null,
+                NOW);
+
+        assertThat(group.requireParticipantByUserId(anaUserId)).isEqualTo(ana);
+
+        UUID outsiderUserId = UUID.randomUUID();
+        assertThatThrownBy(() -> group.requireParticipantByUserId(outsiderUserId))
+                .isInstanceOf(UnauthorizedParticipantAccessException.class);
+        assertThatThrownBy(() -> group.requireParticipantByUserId(null))
+                .isInstanceOf(UnauthorizedParticipantAccessException.class);
     }
 }

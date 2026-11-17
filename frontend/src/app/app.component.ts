@@ -30,7 +30,7 @@ import { ToastContainerComponent } from './shared/toast/toast-container.componen
 
         <div class="festive-garland w-full" aria-hidden="true"></div>
 
-        <main class="flex-1 p-4 sm:p-5 animate-fade-slide-up">
+        <main class="flex-1 p-4 sm:p-5">
           <router-outlet />
         </main>
       </div>

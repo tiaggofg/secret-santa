@@ -104,32 +104,29 @@ sequenceDiagram
 
 ---
 
-## 4. Sequência 3 — Revelação Efêmera e Modo "Passar o Celular"
+## 4. Sequência 3 — Revelação Efêmera Autenticada (`DRAWN`)
 
 ```mermaid
 sequenceDiagram
-    actor P1 as Familiar 1
-    actor P2 as Familiar 2 (Mesmo Celular)
+    actor P1 as Participante Autenticado
     participant SPA as PublicGroupPageComponent
     participant Modal as EphemeralRevealModalComponent
     participant API as GroupPublicController
     participant DB as MongoDB
 
-    P1->>SPA: Clica em "Revelar meu Amigo Secreto"
-    SPA->>Modal: Abre modal efêmero
-    P1->>Modal: Digita nome de usuário + PIN (4-6 dígitos)
-    Modal->>API: POST /api/v1/groups/{groupId}/participants/reveal
-    API->>DB: Valida credenciais BCrypt e marca revealedAt
+    P1->>SPA: Clica em "Ver meu presente"
+    SPA->>SPA: Abre modal de confirmação de senha (centralizado na viewport)
+    P1->>SPA: Digita sua senha e confirma
+    SPA->>API: POST /api/v1/groups/{groupId}/participants/reveal ({ password } + Cookie ss_access_token)
+    API->>DB: Valida participação (403 se não inscrito), senha BCrypt do usuário autenticado (401 INVALID_PASSWORD) e marca revealedAt
     DB-->>API: Atualizado
-    API-->>Modal: 200 OK (drawnParticipantName)
-    Modal-->>P1: Exibe nome sorteado apenas em Signal de memória
+    API-->>SPA: 200 OK (drawnParticipantName)
+    SPA->>Modal: Fecha modal de senha e abre EphemeralRevealModalComponent
+    Modal-->>P1: Exibe nome sorteado apenas em Signal de memória ("Sigilo de Natal")
 
-    P1->>Modal: Fecha modal (ou troca de aba / visibilitychange)
-    Modal->>Modal: Limpa drawnName, PIN e formulários imediatamente
-
-    P1->>SPA: Passa o celular para Familiar 2
-    P2->>SPA: Clica em "Revelar meu Amigo Secreto" e informa seu usuário + PIN
-    Note over SPA,Modal: Nenhum dado de P1 permanece em storage ou tela
+    P1->>Modal: Clica em "Fechar" (ou troca de aba / visibilitychange)
+    Modal->>Modal: Limpa drawnName e senha imediatamente
+    Note over SPA,Modal: Caso precise trocar de usuário no aparelho, aciona "Trocar de conta" (POST /auth/logout)
 ```
 
 ---

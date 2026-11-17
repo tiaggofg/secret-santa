@@ -20,11 +20,11 @@ import { FestiveIconComponent } from '../../shared/components/festive-icon.compo
         aria-modal="true"
         aria-labelledby="reveal-modal-title"
         data-testid="ephemeral-reveal-backdrop"
-        class="fixed inset-0 z-50 bg-pine-950/95 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
+        class="fixed inset-0 z-50 bg-pine-950/95 backdrop-blur-sm flex p-4 overflow-y-auto"
       >
         <div
           data-testid="ephemeral-reveal-card"
-          class="w-full max-w-sm bg-festive-cream border-2 border-gold-500 rounded-3xl overflow-hidden shadow-2xl text-center animate-fade-slide-up"
+          class="m-auto w-full max-w-sm bg-festive-cream border-2 border-gold-500 rounded-3xl overflow-hidden shadow-2xl text-center animate-fade-slide-up"
         >
           <!-- Cranberry & Gold Gift Ribbon Header -->
           <div class="bg-gradient-to-r from-cranberry-800 via-cranberry-700 to-cranberry-800 px-5 py-4 text-white relative border-b-2 border-gold-400">
@@ -53,11 +53,11 @@ import { FestiveIconComponent } from '../../shared/components/festive-icon.compo
               {{ secretFriend }}
             </div>
 
-            <!-- Pass the phone privacy shield notice -->
+            <!-- Secret privacy shield notice -->
             <div class="flex items-start gap-2.5 text-left rounded-xl bg-gold-50 border border-gold-200 p-3 text-xs text-ink-900 leading-relaxed">
               <app-festive-icon name="shield-eye" svgClass="w-5 h-5 text-gold-600 shrink-0 mt-0.5" />
               <p>
-                <strong>Modo Passar o Celular:</strong> memorize o nome acima. Ao tocar no botão abaixo ou bloquear a tela, este segredo é apagado imediatamente.
+                <strong>Sigilo de Natal:</strong> o nome some da tela assim que você fechar ou sair. Você pode consultá-lo novamente a qualquer momento usando sua senha.
               </p>
             </div>
 
@@ -67,7 +67,7 @@ import { FestiveIconComponent } from '../../shared/components/festive-icon.compo
               (click)="wipeAndClose()"
               class="w-full min-h-[52px] rounded-2xl bg-pine-800 hover:bg-pine-900 active:bg-pine-950 text-white font-extrabold text-base px-4 py-3.5 shadow-md transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
             >
-              Fechar e passar o celular
+              Fechar
             </button>
           </div>
         </div>

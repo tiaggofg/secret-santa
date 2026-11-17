@@ -178,12 +178,12 @@ describe('SecretSantaApiService, AuthSessionStore & ShareLinkService', () => {
 
     let revealResponse: unknown;
     service
-      .revealMatch(groupId, { username: 'joao.silva', password: 'Natal@2026' })
+      .revealMatch(groupId, { password: 'Natal@2026' })
       .subscribe((res) => (revealResponse = res));
 
     const revealReq = httpMock.expectOne(`/api/v1/groups/${groupId}/participants/reveal`);
     expect(revealReq.request.method).toBe('POST');
-    expect(revealReq.request.body).toEqual({ username: 'joao.silva', password: 'Natal@2026' });
+    expect(revealReq.request.body).toEqual({ password: 'Natal@2026' });
     revealReq.flush({
       participantId: 'p-1',
       username: 'joao.silva',

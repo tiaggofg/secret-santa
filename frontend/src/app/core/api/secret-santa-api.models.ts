@@ -132,7 +132,6 @@ export interface PinResetResultView {
 }
 
 export interface RevealMatchRequest {
-  username: string;
   password: string;
 }
 

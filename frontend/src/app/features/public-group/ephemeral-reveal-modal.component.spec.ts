@@ -20,7 +20,7 @@ describe('EphemeralRevealModalComponent', () => {
     fixture.detectChanges();
   });
 
-  it('displays drawnParticipantName in a high-contrast card with button "Fechar e passar o celular" (C33)', () => {
+  it('displays drawnParticipantName in a high-contrast card with button "Fechar" and "Sigilo de Natal" notice (C33)', () => {
     component.drawnParticipantName = 'Lucas Godoy';
     component.username = 'maria.silva';
     fixture.detectChanges();
@@ -30,11 +30,13 @@ describe('EphemeralRevealModalComponent', () => {
 
     expect(nameBox).not.toBeNull();
     expect(nameBox.textContent).toContain('Lucas Godoy');
+    expect(fixture.nativeElement.textContent).toContain('Sigilo de Natal');
+    expect(fixture.nativeElement.textContent).toContain('consultá-lo novamente a qualquer momento usando sua senha');
     expect(closeBtn).not.toBeNull();
-    expect(closeBtn.textContent).toContain('Fechar e passar o celular');
+    expect(closeBtn.textContent.trim()).toBe('Fechar');
   });
 
-  it('wipes drawnName Signal to null and removes modal from DOM immediately on clicking "Fechar e passar o celular" (C34)', () => {
+  it('wipes drawnName Signal to null and removes modal from DOM immediately on clicking "Fechar" (C34)', () => {
     const closedSpy = vi.fn();
     component.closed.subscribe(closedSpy);
     component.open('Ana Clara', 'joao.silva');

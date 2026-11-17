@@ -23,7 +23,7 @@ O projeto foi desenhado para uso familiar compartilhado (incluindo o modo **"Pas
 
 ### 1.4. Proteção Absoluta do Resultado do Sorteio
 - Nenhum endpoint de listagem ou consulta (`GET /api/v1/groups`, `GET /api/v1/groups/{groupId}`, `GET /api/v1/groups/{groupId}/admin`) expõe `drawnParticipantId`, `drawnParticipantName`, `pinHash` ou `resetTokenHash`.
-- O nome sorteado só é retornado individualmente em `POST /api/v1/groups/{groupId}/participants/reveal` mediante validação de `username` + `password`.
+- O nome sorteado só é retornado individualmente em `POST /api/v1/groups/{groupId}/participants/reveal`, que exige cookie `HttpOnly` (`ss_access_token`) válido, verifica inscrição do usuário autenticado no grupo (`403 FORBIDDEN_PARTICIPANT_ACCESS` caso contrário), recebe exclusivamente `{ "password": "..." }` (ignorando qualquer `username` injetado no payload) e valida a senha BCrypt da conta autenticada (`401 INVALID_PASSWORD` em erro de senha).
 
 ---
 
@@ -33,4 +33,4 @@ O projeto foi desenhado para uso familiar compartilhado (incluindo o modo **"Pas
 - **Memória Volátil (Signals)**:
   - [`AuthSessionStore`](file:///home/tiago.godoy@db1.com.br/workspace/tiaggofg/secret-santa/frontend/src/app/core/auth/auth-session.store.ts) mantém apenas `{ userId, name, username }` em Signals na memória da aba (hidratado via `GET /api/v1/auth/me` no bootstrap).
   - [`EphemeralRevealModalComponent`](file:///home/tiago.godoy@db1.com.br/workspace/tiaggofg/secret-santa/frontend/src/app/features/public-group/ephemeral-reveal-modal.component.ts) limpa o resultado sorteado imediatamente ao fechar o modal, em `ngOnDestroy` e ao disparar `document.visibilitychange`.
-- **Modo "Passar o Celular"**: Ao acionar `"Trocar / Sair"`, a aplicação chama `POST /api/v1/auth/logout` para expirar os cookies `HttpOnly` no servidor e limpa `AuthSessionStore`, preservando apenas o cache efêmero de geolocalização do dispositivo ([`DeviceSessionGeoStore`](file:///home/tiago.godoy@db1.com.br/workspace/tiaggofg/secret-santa/frontend/src/app/core/geolocation/device-session-geo.store.ts)).
+- **Troca de Conta no Mesmo Aparelho**: Ao acionar `"Trocar / Sair"` (na Home) ou `"Trocar de conta"` (na página do grupo), a aplicação chama `POST /api/v1/auth/logout` para expirar os cookies `HttpOnly` no servidor e limpa `AuthSessionStore`, preservando apenas o cache efêmero de geolocalização do dispositivo ([`DeviceSessionGeoStore`](file:///home/tiago.godoy@db1.com.br/workspace/tiaggofg/secret-santa/frontend/src/app/core/geolocation/device-session-geo.store.ts)).

@@ -70,6 +70,25 @@ import { ToastService } from '../../shared/toast/toast.service';
       }
 
       @if (group(); as g) {
+        @if (authStore.isAuthenticated()) {
+          <div
+            data-testid="public-group-identity-bar"
+            class="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 rounded-2xl bg-festive-card border border-festive-border text-xs text-ink-700"
+          >
+            <span class="truncate">
+              Conectado como <strong class="text-ink-900">{{ authStore.name() }}</strong> (&#64;{{ authStore.username() }})
+            </span>
+            <button
+              type="button"
+              data-testid="public-group-switch-account-btn"
+              (click)="switchAccount()"
+              class="min-h-11 px-2 text-xs font-bold text-pine-800 hover:text-pine-950 underline underline-offset-4 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 rounded-lg"
+            >
+              Trocar de conta
+            </button>
+          </div>
+        }
+
         <!-- Festive Invitation Card -->
         <section class="bg-festive-card border border-festive-border rounded-3xl p-5 shadow-sm space-y-3 relative overflow-hidden">
           <div class="flex items-start justify-between gap-2">
@@ -335,91 +354,121 @@ import { ToastService } from '../../shared/toast/toast.service';
             </section>
           }
         } @else {
-          <!-- DRAWN STATE: Reveal Secret Friend with nome de usuário + PIN -->
-          <section
-            data-testid="reveal-form-section"
-            class="bg-festive-card border border-festive-border rounded-3xl p-5 shadow-sm space-y-4"
-          >
-            <div class="space-y-2">
-              <div class="flex items-center gap-2">
-                <app-festive-icon name="gift-open" svgClass="w-5 h-5 text-cranberry-700" />
-                <h2 class="font-display text-lg font-bold text-ink-900">Consultar Quem Eu Tirei</h2>
-              </div>
-
-              <!-- 3-step visual guide -->
-              <div class="grid grid-cols-3 gap-1.5 text-center text-[11px] font-semibold">
-                <div class="rounded-xl bg-festive-cream border border-festive-border p-2 text-ink-900">
-                  1. Informe seu nome de usuário
-                </div>
-                <div class="rounded-xl bg-festive-cream border border-festive-border p-2 text-ink-900">
-                  2. Digite sua senha
-                </div>
-                <div class="rounded-xl bg-cranberry-50 border border-cranberry-200 p-2 text-cranberry-800">
-                  3. Abra seu presente
-                </div>
-              </div>
-            </div>
-
-            <form
-              [formGroup]="revealForm"
-              (ngSubmit)="submitReveal()"
-              data-testid="reveal-form"
-              class="space-y-4"
+          <!-- DRAWN STATE -->
+          @if (authStore.isAuthenticated() && g.joined) {
+            <section
+              data-testid="reveal-action-section"
+              class="bg-festive-card border border-festive-border rounded-3xl p-5 shadow-sm space-y-4 text-center"
             >
-              <div>
-                <label for="reveal-username" class="block text-sm font-semibold text-ink-900 mb-1.5">
-                  Seu nome de usuário
-                </label>
-                <input
-                  id="reveal-username"
-                  type="text"
-                  formControlName="username"
-                  placeholder="Ex: maria.silva"
-                  autocapitalize="none"
-                  class="w-full min-h-12 rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-base lowercase text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label for="reveal-password" class="block text-sm font-semibold text-ink-900 mb-1.5">
-                  Sua senha
-                </label>
-                <div class="relative flex items-center">
-                  <input
-                    id="reveal-password"
-                    [type]="showRevealPassword() ? 'text' : 'password'"
-                    formControlName="password"
-                    autocomplete="current-password"
-                    placeholder="Digite sua senha"
-                    class="w-full min-h-12 rounded-xl border border-stone-300 bg-white pl-3.5 pr-12 py-2.5 text-base text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    (click)="showRevealPassword.set(!showRevealPassword())"
-                    aria-label="Mostrar ou ocultar senha"
-                    class="absolute right-1 min-w-11 min-h-11 rounded-lg flex items-center justify-center text-ink-600 hover:text-pine-900 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-                  >
-                    <app-festive-icon [name]="showRevealPassword() ? 'eye-off' : 'eye'" svgClass="w-5 h-5" />
-                  </button>
+              <div class="space-y-1.5">
+                <div class="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-cranberry-50 border border-cranberry-200 text-cranberry-700 mx-auto">
+                  <app-festive-icon name="gift-open" svgClass="w-6 h-6" />
                 </div>
+                <h2 class="font-display text-lg font-bold text-ink-900">
+                  O sorteio foi realizado!
+                </h2>
+                <p class="text-xs text-ink-600 leading-relaxed">
+                  Toque abaixo e confirme sua senha para revelar em sigilo quem você tirou.
+                </p>
               </div>
 
               <button
-                type="submit"
-                data-testid="reveal-submit-btn"
-                [disabled]="isSubmitting()"
-                class="w-full min-h-12 rounded-xl bg-cranberry-700 hover:bg-cranberry-800 disabled:opacity-60 text-white font-bold text-base shadow-sm transition flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                type="button"
+                data-testid="open-reveal-password-modal-btn"
+                (click)="openRevealPasswordModal()"
+                class="w-full min-h-12 rounded-xl bg-cranberry-700 hover:bg-cranberry-800 active:bg-cranberry-900 text-white font-bold text-base shadow-sm transition flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
               >
-                @if (isSubmitting()) {
-                  <app-festive-icon name="spinner" svgClass="w-5 h-5" />
-                  <span>Abrindo presente...</span>
-                } @else {
-                  <app-festive-icon name="gift-open" svgClass="w-5 h-5" />
-                  <span>Abrir Meu Presente</span>
-                }
+                <app-festive-icon name="gift-open" svgClass="w-5 h-5" />
+                <span>Ver meu presente</span>
               </button>
-            </form>
-          </section>
+            </section>
+          } @else if (!authStore.isAuthenticated()) {
+            <section
+              data-testid="drawn-login-section"
+              class="bg-festive-card border border-festive-border rounded-3xl p-5 shadow-sm space-y-4"
+            >
+              <div class="space-y-1">
+                <h2 class="font-display text-lg font-bold text-ink-900">
+                  Entre para ver seu amigo secreto
+                </h2>
+                <p class="text-xs text-ink-600 leading-relaxed">
+                  O sorteio já foi realizado. Entre com sua conta para consultar quem você tirou.
+                </p>
+              </div>
+
+              <form
+                [formGroup]="drawnLoginForm"
+                (ngSubmit)="submitDrawnLogin()"
+                data-testid="drawn-login-form"
+                class="space-y-4"
+              >
+                <div>
+                  <label for="drawn-login-username" class="block text-sm font-semibold text-ink-900 mb-1.5">
+                    Seu nome de usuário
+                  </label>
+                  <input
+                    id="drawn-login-username"
+                    type="text"
+                    formControlName="username"
+                    placeholder="Ex: maria.silva"
+                    autocapitalize="none"
+                    class="w-full min-h-12 rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-base lowercase text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label for="drawn-login-password" class="block text-sm font-semibold text-ink-900 mb-1.5">
+                    Sua senha
+                  </label>
+                  <div class="relative flex items-center">
+                    <input
+                      id="drawn-login-password"
+                      [type]="showDrawnLoginPassword() ? 'text' : 'password'"
+                      formControlName="password"
+                      autocomplete="current-password"
+                      placeholder="Digite sua senha"
+                      class="w-full min-h-12 rounded-xl border border-stone-300 bg-white pl-3.5 pr-12 py-2.5 text-base text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      (click)="showDrawnLoginPassword.set(!showDrawnLoginPassword())"
+                      aria-label="Mostrar ou ocultar senha"
+                      class="absolute right-1 min-w-11 min-h-11 rounded-lg flex items-center justify-center text-ink-600 hover:text-pine-900 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                    >
+                      <app-festive-icon [name]="showDrawnLoginPassword() ? 'eye-off' : 'eye'" svgClass="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  data-testid="drawn-login-submit-btn"
+                  [disabled]="isSubmitting()"
+                  class="w-full min-h-12 rounded-xl bg-pine-800 hover:bg-pine-900 disabled:opacity-60 text-white font-bold text-base shadow-sm transition flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                >
+                  @if (isSubmitting()) {
+                    <app-festive-icon name="spinner" svgClass="w-5 h-5" />
+                    <span>Entrando...</span>
+                  } @else {
+                    <span>Entrar</span>
+                  }
+                </button>
+              </form>
+            </section>
+          } @else {
+            <section
+              data-testid="drawn-not-participant-notice"
+              class="bg-gold-50 border border-gold-200 rounded-3xl p-5 shadow-sm space-y-2 text-ink-900"
+            >
+              <div class="flex items-center gap-2 font-display font-bold text-base text-ink-900">
+                <app-festive-icon name="shield-eye" svgClass="w-5 h-5 text-gold-700 shrink-0" />
+                <span>Sorteio já realizado</span>
+              </div>
+              <p class="text-sm text-ink-700 leading-relaxed">
+                O sorteio deste grupo já foi concluído e a conta atual (&#64;{{ authStore.username() }}) não participa deste grupo.
+              </p>
+            </section>
+          }
         }
 
         <!-- Participant List (only visible to organizer or enrolled participants) -->
@@ -466,17 +515,11 @@ import { ToastService } from '../../shared/toast/toast.service';
                       </span>
                     </div>
                   } @else {
-                    <!-- Interactive button to select participant when DRAWN -->
-                    <button
-                      type="button"
+                    <!-- Non-interactive informational card when DRAWN -->
+                    <div
                       data-testid="participant-list-item"
                       [attr.data-reveal-status]="p.revealStatus"
-                      (click)="onSelectParticipantFromList(p)"
-                      [class]="
-                        revealForm.controls.username.value === p.username
-                          ? 'w-full min-h-[56px] text-left bg-gold-50/70 border-2 border-pine-800 rounded-2xl p-3.5 shadow-sm flex items-center justify-between gap-2.5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500'
-                          : 'w-full min-h-[56px] text-left bg-festive-card hover:bg-festive-cream border border-festive-border rounded-2xl p-3.5 shadow-sm flex items-center justify-between gap-2.5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500'
-                      "
+                      class="w-full bg-festive-card border border-festive-border rounded-2xl p-3.5 shadow-sm flex items-center justify-between gap-2.5"
                     >
                       <div class="flex items-center gap-3 min-w-0">
                         <div
@@ -488,7 +531,17 @@ import { ToastService } from '../../shared/toast/toast.service';
                           {{ initials(p.name) }}
                         </div>
                         <div class="min-w-0">
-                          <p class="font-bold text-ink-900 text-sm truncate">{{ p.name }}</p>
+                          <div class="flex items-center gap-1.5 min-w-0">
+                            <p class="font-bold text-ink-900 text-sm truncate">{{ p.name }}</p>
+                            @if (isCurrentUserParticipant(p)) {
+                              <span
+                                data-testid="current-user-participant-badge"
+                                class="px-2 py-0.5 rounded-full bg-pine-100 border border-pine-300 text-pine-900 text-[11px] font-bold shrink-0"
+                              >
+                                Você
+                              </span>
+                            }
+                          </div>
                           <p class="text-xs text-ink-600 truncate">&#64;{{ p.username }}</p>
                         </div>
                       </div>
@@ -507,7 +560,7 @@ import { ToastService } from '../../shared/toast/toast.service';
                         />
                         <span>{{ formatParticipantRevealStatus(p) }}</span>
                       </span>
-                    </button>
+                    </div>
                   }
                 }
               </div>
@@ -524,6 +577,104 @@ import { ToastService } from '../../shared/toast/toast.service';
             </span>
           </section>
         }
+      }
+
+      @if (isRevealPasswordModalOpen() && group(); as g) {
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reveal-password-modal-title"
+          data-testid="reveal-password-modal"
+          class="fixed inset-0 z-50 bg-pine-950/85 backdrop-blur-sm flex p-4 overflow-y-auto"
+        >
+          <div class="m-auto w-full max-w-sm bg-festive-card border border-festive-border rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4 animate-fade-slide-up">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <h2 id="reveal-password-modal-title" class="font-display text-xl font-bold text-ink-900">
+                  Confirmar senha
+                </h2>
+                <p class="text-xs text-ink-600 mt-0.5">
+                  Consultando como <strong>{{ currentParticipantDisplayName(g) }}</strong> (&#64;{{ authStore.username() }})
+                </p>
+              </div>
+              <button
+                type="button"
+                data-testid="close-reveal-password-modal-btn"
+                (click)="closeRevealPasswordModal()"
+                aria-label="Fechar"
+                class="min-w-11 min-h-11 rounded-xl flex items-center justify-center text-ink-600 hover:text-ink-900 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 text-lg font-bold"
+              >
+                ×
+              </button>
+            </div>
+
+            @if (revealPasswordError()) {
+              <div
+                role="alert"
+                data-testid="reveal-password-error"
+                class="rounded-xl bg-cranberry-50 border border-cranberry-200 p-3 text-xs text-cranberry-800 font-medium break-words"
+              >
+                {{ revealPasswordError() }}
+              </div>
+            }
+
+            <form
+              [formGroup]="revealPasswordForm"
+              (ngSubmit)="submitReveal()"
+              data-testid="reveal-password-form"
+              class="space-y-4"
+            >
+              <div>
+                <label for="reveal-modal-password" class="block text-sm font-semibold text-ink-900 mb-1.5">
+                  Sua senha
+                </label>
+                <div class="relative flex items-center">
+                  <input
+                    id="reveal-modal-password"
+                    [type]="showRevealPassword() ? 'text' : 'password'"
+                    formControlName="password"
+                    autocomplete="current-password"
+                    placeholder="Digite sua senha"
+                    class="w-full min-h-12 rounded-xl border border-stone-300 bg-white pl-3.5 pr-12 py-2.5 text-base text-ink-900 focus:border-pine-800 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    (click)="showRevealPassword.set(!showRevealPassword())"
+                    aria-label="Mostrar ou ocultar senha"
+                    class="absolute right-1 min-w-11 min-h-11 rounded-lg flex items-center justify-center text-ink-600 hover:text-pine-900 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                  >
+                    <app-festive-icon [name]="showRevealPassword() ? 'eye-off' : 'eye'" svgClass="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              <div class="flex gap-2.5">
+                <button
+                  type="button"
+                  data-testid="cancel-reveal-password-modal-btn"
+                  (click)="closeRevealPasswordModal()"
+                  class="flex-1 min-h-12 rounded-xl border border-stone-300 bg-white hover:bg-stone-50 text-ink-800 font-semibold text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  data-testid="reveal-submit-btn"
+                  [disabled]="isSubmitting()"
+                  class="flex-[2] min-h-12 rounded-xl bg-cranberry-700 hover:bg-cranberry-800 disabled:opacity-60 text-white font-bold text-sm shadow-sm transition flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                >
+                  @if (isSubmitting()) {
+                    <app-festive-icon name="spinner" svgClass="w-4 h-4" />
+                    <span>Abrindo...</span>
+                  } @else {
+                    <app-festive-icon name="gift-open" svgClass="w-4 h-4" />
+                    <span>Ver meu presente</span>
+                  }
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       }
 
       <app-ephemeral-reveal-modal
@@ -548,7 +699,10 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
   readonly visitorMode = signal<'login' | 'register'>('login');
   readonly showVisitorRegPassword = signal<boolean>(false);
   readonly showVisitorLoginPassword = signal<boolean>(false);
+  readonly showDrawnLoginPassword = signal<boolean>(false);
   readonly showRevealPassword = signal<boolean>(false);
+  readonly isRevealPasswordModalOpen = signal<boolean>(false);
+  readonly revealPasswordError = signal<string | null>(null);
   readonly isSubmitting = signal<boolean>(false);
   readonly capturingGeo = signal<boolean>(false);
   readonly errorMessage = signal<string | null>(null);
@@ -571,18 +725,18 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
     password: ['', [Validators.required]]
   });
 
-  readonly revealForm = this.fb.group({
+  readonly drawnLoginForm = this.fb.group({
     username: ['', [Validators.required, Validators.pattern(/^[a-z0-9._-]{3,30}$/)]],
+    password: ['', [Validators.required]]
+  });
+
+  readonly revealPasswordForm = this.fb.group({
     password: ['', [Validators.required]]
   });
 
   ngOnInit(): void {
     this.groupId = this.route.snapshot.paramMap.get('groupId') ?? '';
     this.inviteSignature = this.route.snapshot.queryParamMap?.get('sig') ?? '';
-    const loggedInUsername = this.authStore.username();
-    if (loggedInUsername) {
-      this.revealForm.controls.username.setValue(loggedInUsername);
-    }
     if (this.groupId) {
       this.loadPublicGroup();
     }
@@ -591,7 +745,9 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.revealedFriendName.set(null);
     this.revealedByUsername.set(null);
-    this.revealForm.controls.password.setValue('');
+    this.isRevealPasswordModalOpen.set(false);
+    this.revealPasswordError.set(null);
+    this.revealPasswordForm.controls.password.setValue('');
   }
 
   participantCountLabel(count: number): string {
@@ -846,55 +1002,108 @@ export class PublicGroupPageComponent implements OnInit, OnDestroy {
       });
   }
 
-  onSelectParticipantFromList(participant: PublicParticipantView): void {
-    this.revealForm.controls.username.setValue(participant.username);
-    this.revealForm.controls.password.setValue('');
-    this.errorMessage.set(null);
+  isCurrentUserParticipant(p: PublicParticipantView): boolean {
+    const userId = this.authStore.userId();
+    const username = this.authStore.username();
+    return Boolean((userId && p.userId === userId) || (username && p.username === username));
   }
 
-  submitReveal(): void {
+  switchAccount(): void {
     this.errorMessage.set(null);
-    const { username, password } = this.revealForm.getRawValue();
+    this.closeRevealPasswordModal();
+    this.revealedFriendName.set(null);
+    this.revealedByUsername.set(null);
+    this.apiService.logout().subscribe({
+      next: () => {
+        this.authStore.clear();
+        this.loadPublicGroup();
+      },
+      error: () => {
+        this.authStore.clear();
+        this.loadPublicGroup();
+      }
+    });
+  }
+
+  submitDrawnLogin(): void {
+    this.errorMessage.set(null);
+    const { username, password } = this.drawnLoginForm.getRawValue();
     const normalizedUsername = username.trim().toLowerCase();
 
     if (!/^[a-z0-9._-]{3,30}$/.test(normalizedUsername) || !password) {
-      this.errorMessage.set('Informe o nome de usuário e sua senha.');
+      this.errorMessage.set('Informe seu nome de usuário e sua senha.');
       return;
     }
 
     this.isSubmitting.set(true);
-    this.apiService
-      .revealMatch(this.groupId, {
-        username: normalizedUsername,
-        password
-      })
-      .subscribe({
-        next: (result) => {
-          this.isSubmitting.set(false);
-          this.showRevealPassword.set(false);
-          this.revealForm.controls.password.setValue('');
-          this.revealedByUsername.set(result.username);
-          this.revealedFriendName.set(result.drawnParticipantName);
-          this.loadPublicGroup();
-        },
-        error: (err: HttpErrorResponse) => {
-          this.isSubmitting.set(false);
-          this.revealForm.controls.password.setValue('');
-          if (err.status === 401) {
-            this.errorMessage.set('Nome de usuário ou senha incorretos.');
-          } else if (err.status === 409) {
-            this.errorMessage.set('O sorteio ainda não foi realizado.');
-          } else {
-            this.errorMessage.set('Não foi possível consultar o resultado.');
-          }
+    this.apiService.login({ username: normalizedUsername, password }).subscribe({
+      next: (session) => {
+        this.isSubmitting.set(false);
+        this.authStore.setSession(session);
+        this.showDrawnLoginPassword.set(false);
+        this.drawnLoginForm.reset();
+        this.loadPublicGroup();
+      },
+      error: () => {
+        this.isSubmitting.set(false);
+        this.drawnLoginForm.controls.password.setValue('');
+        this.errorMessage.set('Nome de usuário ou senha incorretos.');
+      }
+    });
+  }
+
+  openRevealPasswordModal(): void {
+    this.revealPasswordError.set(null);
+    this.showRevealPassword.set(false);
+    this.revealPasswordForm.controls.password.setValue('');
+    this.isRevealPasswordModalOpen.set(true);
+  }
+
+  closeRevealPasswordModal(): void {
+    this.isRevealPasswordModalOpen.set(false);
+    this.revealPasswordError.set(null);
+    this.showRevealPassword.set(false);
+    this.revealPasswordForm.controls.password.setValue('');
+  }
+
+  submitReveal(): void {
+    this.revealPasswordError.set(null);
+    const { password } = this.revealPasswordForm.getRawValue();
+
+    if (!password) {
+      this.revealPasswordError.set('Informe sua senha.');
+      return;
+    }
+
+    this.isSubmitting.set(true);
+    this.apiService.revealMatch(this.groupId, { password }).subscribe({
+      next: (result) => {
+        this.isSubmitting.set(false);
+        this.closeRevealPasswordModal();
+        this.revealedByUsername.set(result.username);
+        this.revealedFriendName.set(result.drawnParticipantName);
+        this.loadPublicGroup();
+      },
+      error: (err: HttpErrorResponse) => {
+        this.isSubmitting.set(false);
+        this.revealPasswordForm.controls.password.setValue('');
+        if (err.status === 401) {
+          this.revealPasswordError.set('Senha incorreta.');
+        } else if (err.status === 403) {
+          this.revealPasswordError.set('Você não participa deste grupo.');
+        } else if (err.status === 409) {
+          this.revealPasswordError.set('O sorteio ainda não foi realizado.');
+        } else {
+          this.revealPasswordError.set('Não foi possível consultar o resultado.');
         }
-      });
+      }
+    });
   }
 
   onModalClosed(): void {
     this.revealedFriendName.set(null);
     this.revealedByUsername.set(null);
-    this.revealForm.controls.password.setValue('');
+    this.revealPasswordForm.controls.password.setValue('');
   }
 
   formatParticipantRevealStatus(participant: PublicParticipantView): string {

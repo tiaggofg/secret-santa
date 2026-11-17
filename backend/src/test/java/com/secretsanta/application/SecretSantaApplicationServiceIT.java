@@ -310,8 +310,10 @@ class SecretSantaApplicationServiceIT {
         applicationService.registerParticipant(group.id(), bia.userId(), sig, -23.4500, -51.9500);
         applicationService.registerParticipant(group.id(), caio.userId(), sig, -23.4800, -51.9800);
 
+        AuthSessionView outsider = applicationService.registerUser("Forasteiro", "forasteiro", "Ff6^gg");
+
         // Reveal while OPEN must fail with GroupNotDrawnYetException
-        assertThatThrownBy(() -> applicationService.revealMatch(group.id(), "ana", "Aa1!bb"))
+        assertThatThrownBy(() -> applicationService.revealMatch(group.id(), ana.userId(), "Aa1!bb"))
                 .isInstanceOf(GroupNotDrawnYetException.class);
 
         AdminGroupView drawnGroup = applicationService.executeDraw(group.id(), ana.userId());
@@ -320,14 +322,20 @@ class SecretSantaApplicationServiceIT {
         assertThat(drawnGroup.participants())
                 .allSatisfy(p -> assertThat(p.revealStatus()).isEqualTo(RevealStatus.PENDING_REVEAL));
 
-        // Wrong PIN or non-participant username must fail with InvalidCredentialsException
-        assertThatThrownBy(() -> applicationService.revealMatch(group.id(), "ana", "Xy9!zw"))
-                .isInstanceOf(InvalidCredentialsException.class);
-        assertThatThrownBy(() -> applicationService.revealMatch(group.id(), "desconhecido", "Aa1!bb"))
+        // Unauthenticated user -> InvalidCredentialsException
+        assertThatThrownBy(() -> applicationService.revealMatch(group.id(), null, "Aa1!bb"))
                 .isInstanceOf(InvalidCredentialsException.class);
 
+        // Wrong password -> InvalidRevealPasswordException
+        assertThatThrownBy(() -> applicationService.revealMatch(group.id(), ana.userId(), "Xy9!zw"))
+                .isInstanceOf(com.secretsanta.domain.exception.InvalidRevealPasswordException.class);
+
+        // Non-participant -> UnauthorizedParticipantAccessException
+        assertThatThrownBy(() -> applicationService.revealMatch(group.id(), outsider.userId(), "Ff6^gg"))
+                .isInstanceOf(com.secretsanta.domain.exception.UnauthorizedParticipantAccessException.class);
+
         // Valid reveal
-        RevealMatchView reveal = applicationService.revealMatch(group.id(), "ANA", "Aa1!bb");
+        RevealMatchView reveal = applicationService.revealMatch(group.id(), ana.userId(), "Aa1!bb");
         assertThat(reveal.username()).isEqualTo("ana");
         assertThat(reveal.drawnParticipantName()).isIn("Bia", "Caio");
         assertThat(reveal.revealedAt()).isNotNull();

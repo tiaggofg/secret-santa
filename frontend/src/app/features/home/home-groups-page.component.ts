@@ -258,9 +258,9 @@ import { ToastService } from '../../shared/toast/toast.service';
             aria-modal="true"
             aria-labelledby="create-group-modal-title"
             data-testid="create-group-modal"
-            class="fixed inset-0 z-50 bg-pine-950/85 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
+            class="fixed inset-0 z-50 bg-pine-950/85 backdrop-blur-sm flex p-4 overflow-y-auto"
           >
-            <div class="w-full max-w-md bg-festive-card border border-festive-border rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4 animate-fade-slide-up">
+            <div class="m-auto w-full max-w-md bg-festive-card border border-festive-border rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4 animate-fade-slide-up">
               <div class="flex items-start justify-between gap-2">
                 <div>
                   <h2 id="create-group-modal-title" class="font-display text-xl font-bold text-ink-900">

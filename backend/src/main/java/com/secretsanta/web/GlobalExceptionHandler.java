@@ -10,8 +10,10 @@ import com.secretsanta.domain.exception.InsufficientParticipantsForDrawException
 import com.secretsanta.domain.exception.InvalidCredentialsException;
 import com.secretsanta.domain.exception.InvalidInviteSignatureException;
 import com.secretsanta.domain.exception.InvalidPasswordResetTokenException;
+import com.secretsanta.domain.exception.InvalidRevealPasswordException;
 import com.secretsanta.domain.exception.ResourceNotFoundException;
 import com.secretsanta.domain.exception.UnauthorizedOrganizerAccessException;
+import com.secretsanta.domain.exception.UnauthorizedParticipantAccessException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.net.URI;
@@ -98,6 +100,11 @@ public class GlobalExceptionHandler {
         return buildProblem(HttpStatus.UNAUTHORIZED, "Unauthorized", ex.getMessage(), "INVALID_CREDENTIALS");
     }
 
+    @ExceptionHandler(InvalidRevealPasswordException.class)
+    public ProblemDetail handleInvalidRevealPassword(InvalidRevealPasswordException ex) {
+        return buildProblem(HttpStatus.UNAUTHORIZED, "Unauthorized", ex.getMessage(), "INVALID_PASSWORD");
+    }
+
     @ExceptionHandler(InvalidInviteSignatureException.class)
     public ProblemDetail handleInvalidInviteSignature(InvalidInviteSignatureException ex) {
         return buildProblem(HttpStatus.FORBIDDEN, "Forbidden", ex.getMessage(), "INVALID_INVITE_SIGNATURE");
@@ -110,6 +117,15 @@ public class GlobalExceptionHandler {
                 "Forbidden",
                 ex.getMessage(),
                 "FORBIDDEN_ORGANIZER_ACCESS");
+    }
+
+    @ExceptionHandler(UnauthorizedParticipantAccessException.class)
+    public ProblemDetail handleUnauthorizedParticipantAccess(UnauthorizedParticipantAccessException ex) {
+        return buildProblem(
+                HttpStatus.FORBIDDEN,
+                "Forbidden",
+                ex.getMessage(),
+                "FORBIDDEN_PARTICIPANT_ACCESS");
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)

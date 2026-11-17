@@ -288,7 +288,7 @@ class GroupPublicControllerIT {
     }
 
     @Test
-    void shouldRevealDrawnMatchWithValidUsernameAndPinAndMarkRevealed_C30() throws Exception {
+    void shouldRevealDrawnMatchWithAuthenticatedCookieAndPasswordAndIgnoreSpoofedUsername_C30() throws Exception {
         var u1 = applicationService.registerUser("Lucas", "lucas", "Aa1!bb");
         var u2 = applicationService.registerUser("Mariana", "mariana", "Bb2@cc");
         var u3 = applicationService.registerUser("Rafael", "rafael", "Cc3#dd");
@@ -300,11 +300,13 @@ class GroupPublicControllerIT {
         applicationService.registerParticipant(group.id(), u3.userId(), sig, -23.48, -51.98);
         applicationService.executeDraw(group.id(), u1.userId());
 
+        // Even if payload tries to spoof "username": "mariana", backend ignores it and reveals for u1 (lucas)
         MvcResult res = mockMvc.perform(post("/api/v1/groups/{groupId}/participants/reveal", group.id())
+                        .cookie(accessCookie(u1))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "username", "lucas",
-                                "pin", "Aa1!bb"))))
+                                "username", "mariana",
+                                "password", "Aa1!bb"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.participantId").isNotEmpty())
                 .andExpect(jsonPath("$.username").value("lucas"))
@@ -318,11 +320,12 @@ class GroupPublicControllerIT {
     }
 
     @Test
-    void shouldRejectRevealWithWrongPinOrNonMemberUsernameWith401_C31() throws Exception {
+    void shouldRejectRevealWithoutCookieWith401InvalidCredentials_AndWrongPasswordOrSpoofedPasswordWith401InvalidPassword_AndNonMemberWith403_C31()
+            throws Exception {
         var u1 = applicationService.registerUser("Lucas", "lucas.c31", "Aa1!bb");
         var u2 = applicationService.registerUser("Mariana", "mariana.c31", "Bb2@cc");
         var u3 = applicationService.registerUser("Rafael", "rafael.c31", "Cc3#dd");
-        applicationService.registerUser("Forasteiro", "forasteiro.c31", "Ff6^gg");
+        var outsider = applicationService.registerUser("Forasteiro", "forasteiro.c31", "Ff6^gg");
 
         var group = applicationService.createGroup(u1.userId(), "Natal C31");
         String sig = extractSig(group);
@@ -331,21 +334,30 @@ class GroupPublicControllerIT {
         applicationService.registerParticipant(group.id(), u3.userId(), sig, null, null);
         applicationService.executeDraw(group.id(), u1.userId());
 
-        // Incorrect PIN -> 401
+        // Missing cookie -> 401 INVALID_CREDENTIALS
         mockMvc.perform(post("/api/v1/groups/{groupId}/participants/reveal", group.id())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "username", "lucas.c31",
-                                "pin", "Xy9!zw"))))
-                .andExpect(status().isUnauthorized());
+                        .content(objectMapper.writeValueAsString(Map.of("password", "Aa1!bb"))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_CREDENTIALS"));
 
-        // Username not enrolled in group -> 401
+        // Incorrect password (including attempt with Mariana's password while logged as Lucas) -> 401 INVALID_PASSWORD
         mockMvc.perform(post("/api/v1/groups/{groupId}/participants/reveal", group.id())
+                        .cookie(accessCookie(u1))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "username", "forasteiro.c31",
-                                "pin", "Ff6^gg"))))
-                .andExpect(status().isUnauthorized());
+                                "username", "mariana.c31",
+                                "password", "Bb2@cc"))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_PASSWORD"));
+
+        // Authenticated non-member -> 403 FORBIDDEN_PARTICIPANT_ACCESS
+        mockMvc.perform(post("/api/v1/groups/{groupId}/participants/reveal", group.id())
+                        .cookie(accessCookie(outsider))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("password", "Ff6^gg"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("FORBIDDEN_PARTICIPANT_ACCESS"));
     }
 
     @Test
@@ -355,10 +367,9 @@ class GroupPublicControllerIT {
         applicationService.registerParticipant(group.id(), u1.userId(), null, null, null);
 
         mockMvc.perform(post("/api/v1/groups/{groupId}/participants/reveal", group.id())
+                        .cookie(accessCookie(u1))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "username", "lucas.c32",
-                                "password", "Aa1!bb"))))
+                        .content(objectMapper.writeValueAsString(Map.of("password", "Aa1!bb"))))
                 .andExpect(status().isConflict());
     }
 

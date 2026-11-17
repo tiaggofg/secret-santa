@@ -7,6 +7,7 @@ import com.secretsanta.domain.exception.GroupNotDrawnYetException;
 import com.secretsanta.domain.exception.InsufficientParticipantsForDrawException;
 import com.secretsanta.domain.exception.ResourceNotFoundException;
 import com.secretsanta.domain.exception.UnauthorizedOrganizerAccessException;
+import com.secretsanta.domain.exception.UnauthorizedParticipantAccessException;
 import com.secretsanta.domain.service.DerangementDrawService;
 import com.secretsanta.domain.service.HouseholdClusterService;
 import java.time.Instant;
@@ -132,6 +133,18 @@ public final class SecretSantaGroup {
             return false;
         }
         return participants.stream().anyMatch(p -> p.userId().equals(userId));
+    }
+
+    public Participant requireParticipantByUserId(UUID userId) {
+        if (userId == null) {
+            throw new UnauthorizedParticipantAccessException(
+                    "Only registered participants of this group can perform this operation");
+        }
+        return participants.stream()
+                .filter(p -> p.userId().equals(userId))
+                .findFirst()
+                .orElseThrow(() -> new UnauthorizedParticipantAccessException(
+                        "Only registered participants of this group can perform this operation"));
     }
 
     public Participant registerParticipant(

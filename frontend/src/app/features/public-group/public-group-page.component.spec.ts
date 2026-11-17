@@ -71,6 +71,8 @@ describe('PublicGroupPageComponent', () => {
     getPublicGroup: vi.fn(),
     joinGroup: vi.fn(),
     revealMatch: vi.fn(),
+    login: vi.fn(),
+    logout: vi.fn(),
     me: vi.fn()
   };
 
@@ -293,7 +295,7 @@ describe('PublicGroupPageComponent', () => {
     });
   });
 
-  it('displays reveal form even when inviteValid is false and participants are hidden in DRAWN state, and pre-fills when visible', () => {
+  it('shows compact login card when DRAWN and unauthenticated, then switches to single-CTA reveal after login', () => {
     apiMock.getPublicGroup.mockReturnValue(
       of({
         ...openValidInviteGroupMock,
@@ -306,28 +308,84 @@ describe('PublicGroupPageComponent', () => {
     component.loadPublicGroup();
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('[data-testid="reveal-form-section"]')).not.toBeNull();
-    expect(fixture.nativeElement.querySelector('[data-testid="public-participants-list"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="reveal-form-section"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="drawn-login-section"]')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="open-reveal-password-modal-btn"]')).toBeNull();
 
+    apiMock.login.mockReturnValue(
+      of({ userId: 'u-1', name: 'Maria Silva', username: 'maria.silva' })
+    );
+    apiMock.getPublicGroup.mockReturnValue(of(drawnVisibleGroupMock));
+
+    component.drawnLoginForm.setValue({
+      username: 'maria.silva',
+      password: 'Natal@2026'
+    });
+    const loginForm: HTMLFormElement = fixture.nativeElement.querySelector('[data-testid="drawn-login-form"]');
+    loginForm.dispatchEvent(new Event('submit'));
+    fixture.detectChanges();
+
+    expect(apiMock.login).toHaveBeenCalledWith({ username: 'maria.silva', password: 'Natal@2026' });
+    expect(authStore.isAuthenticated()).toBe(true);
+    expect(fixture.nativeElement.querySelector('[data-testid="reveal-action-section"]')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="open-reveal-password-modal-btn"]')).not.toBeNull();
+  });
+
+  it('shows drawn-not-participant-notice when DRAWN, authenticated, and not joined', () => {
+    authStore.setSession({ userId: 'u-99', name: 'Forasteiro', username: 'forasteiro' });
+    component.group.set({
+      ...openValidInviteGroupMock,
+      status: 'DRAWN',
+      joined: false,
+      participantsVisible: false
+    });
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('[data-testid="drawn-not-participant-notice"]')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="open-reveal-password-modal-btn"]')).toBeNull();
+  });
+
+  it('renders non-clickable participant cards with "Você" badge, opens password modal, handles 401 and reveals match', () => {
+    authStore.setSession({ userId: 'u-1', name: 'Maria Silva', username: 'maria.silva' });
     apiMock.getPublicGroup.mockReturnValue(of(drawnVisibleGroupMock));
     component.loadPublicGroup();
     fixture.detectChanges();
 
-    const items: NodeListOf<HTMLButtonElement> = fixture.nativeElement.querySelectorAll(
+    // Non-clickable div cards + "Você" badge on Maria's card
+    const items: NodeListOf<HTMLElement> = fixture.nativeElement.querySelectorAll(
       '[data-testid="participant-list-item"]'
     );
     expect(items.length).toBe(2);
-    items[0].click();
-    fixture.detectChanges();
-    expect(component.revealForm.controls.username.value).toBe('maria.silva');
-  });
+    expect(items[0].tagName.toLowerCase()).toBe('div');
+    const youBadges = fixture.nativeElement.querySelectorAll('[data-testid="current-user-participant-badge"]');
+    expect(youBadges.length).toBe(1);
+    expect(items[0].textContent).toContain('Você');
 
-  it('reveals Secret Santa match with valid nome de usuário + password and opens EphemeralRevealModalComponent', () => {
-    apiMock.getPublicGroup.mockReturnValue(of(drawnVisibleGroupMock));
-    component.loadPublicGroup();
+    // Open password modal
+    const openBtn: HTMLButtonElement = fixture.nativeElement.querySelector(
+      '[data-testid="open-reveal-password-modal-btn"]'
+    );
+    openBtn.click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-testid="reveal-password-modal"]')).not.toBeNull();
+
+    // Wrong password keeps modal open, clears password, and shows inline error
+    apiMock.revealMatch.mockReturnValueOnce(
+      throwError(() => new HttpErrorResponse({ status: 401, error: { errorCode: 'INVALID_PASSWORD' } }))
+    );
+    component.revealPasswordForm.controls.password.setValue('Errada@123');
+    const modalForm: HTMLFormElement = fixture.nativeElement.querySelector('[data-testid="reveal-password-form"]');
+    modalForm.dispatchEvent(new Event('submit'));
     fixture.detectChanges();
 
-    apiMock.revealMatch.mockReturnValue(
+    expect(fixture.nativeElement.querySelector('[data-testid="reveal-password-modal"]')).not.toBeNull();
+    expect(component.revealPasswordForm.controls.password.value).toBe('');
+    expect(fixture.nativeElement.querySelector('[data-testid="reveal-password-error"]')?.textContent).toContain(
+      'Senha incorreta'
+    );
+
+    // Correct password closes password modal and opens EphemeralRevealModalComponent
+    apiMock.revealMatch.mockReturnValueOnce(
       of({
         participantId: 'p-1',
         username: 'maria.silva',
@@ -335,23 +393,37 @@ describe('PublicGroupPageComponent', () => {
         revealedAt: '2026-11-13T19:10:00Z'
       })
     );
-
-    component.revealForm.setValue({
-      username: 'maria.silva',
-      password: 'Natal@2026'
-    });
-
-    const revealFormEl: HTMLFormElement = fixture.nativeElement.querySelector('[data-testid="reveal-form"]');
-    revealFormEl.dispatchEvent(new Event('submit'));
+    component.revealPasswordForm.controls.password.setValue('Natal@2026');
+    modalForm.dispatchEvent(new Event('submit'));
     fixture.detectChanges();
 
-    expect(apiMock.revealMatch).toHaveBeenCalledWith(groupId, {
-      username: 'maria.silva',
-      password: 'Natal@2026'
-    });
-    expect(component.revealForm.controls.password.value).toBe('');
+    expect(apiMock.revealMatch).toHaveBeenCalledWith(groupId, { password: 'Natal@2026' });
+    expect(component.revealPasswordForm.controls.password.value).toBe('');
+    expect(fixture.nativeElement.querySelector('[data-testid="reveal-password-modal"]')).toBeNull();
     expect(fixture.nativeElement.querySelector('[data-testid="drawn-participant-name"]')?.textContent).toContain(
       'Lucas Silva'
     );
+  });
+
+  it('switches account on clicking "Trocar de conta" and reloads group', () => {
+    authStore.setSession({ userId: 'u-1', name: 'Maria Silva', username: 'maria.silva' });
+    apiMock.getPublicGroup.mockReturnValue(of(drawnVisibleGroupMock));
+    component.loadPublicGroup();
+    fixture.detectChanges();
+
+    apiMock.logout.mockReturnValue(of(void 0));
+    apiMock.getPublicGroup.mockReturnValue(
+      of({ ...drawnVisibleGroupMock, joined: false, participantsVisible: false, participants: [] })
+    );
+
+    const switchBtn: HTMLButtonElement = fixture.nativeElement.querySelector(
+      '[data-testid="public-group-switch-account-btn"]'
+    );
+    switchBtn.click();
+    fixture.detectChanges();
+
+    expect(apiMock.logout).toHaveBeenCalled();
+    expect(authStore.isAuthenticated()).toBe(false);
+    expect(fixture.nativeElement.querySelector('[data-testid="drawn-login-section"]')).not.toBeNull();
   });
 });
